@@ -8,9 +8,11 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# Language ExistentialQuantification #-}
 module Simple where
 
 -- Note: to use this module, you must run your program with the -T rtsopt
@@ -24,6 +26,7 @@ import Data.Hashable
 import Data.Int
 import Data.List
 import Data.Monoid
+import Data.Word
 
 import System.CPUTime
 import System.IO
@@ -36,8 +39,6 @@ import System.Mem
 import Control.Concurrent
 import Easy
 import Text.Printf
-
-import Data.Aeson
 
 _GCStats_size = 152
 
@@ -135,30 +136,58 @@ persistBench br = do
     io $ createDirectoryIfMissing True dir
     io $ writeFile (dir <> show (abs $ hash cs)) (show br)
 
--- | Check if two reals are of similar magnitude given a scaling base `b`.
---
--- In general, as x grows, relative epsilon shrinks as a factor of log_b x.
---
--- `exp 1`, exported as `e`, is a good default base when developing in general. As optimization
--- becomes a focus, shrink `b` towards 1.
---
--- Note: For b < 1, similar b _ _ -> False
---
-{-# INLINE similar #-}
-similar :: (Real a,Real b) => a -> b -> b -> Bool
-similar (realToFrac -> b) (realToFrac -> x) (realToFrac -> y) =
-    -- As b ↘ 1, epsilon ↘ 0
-    let epsilon = (x :: Double) / (exp 1 * logBase b (x + 1))
-        (lo,hi) = (x - epsilon,x + epsilon)
-    in lo <= y && y <= hi
+class Similar a where
+  similar :: Real b => b -> a -> a -> Bool
+  default similar :: (Real b, Real a) => b -> a -> a -> Bool
+  -- | Check if two reals are of similar magnitude given a scaling base `b`.
+  --
+  -- In general, as x grows, relative epsilon shrinks as a factor of log_b x.
+  --
+  -- `exp 1`, exported as `e`, is a good default base when developing in general. As optimization
+  -- becomes a focus, shrink `b` towards 1.
+  --
+  -- Note: For b < 1, similar b _ _ -> False
+  --
+  {-# INLINE similar #-}
+  -- similar :: (Real a,Real b) => a -> b -> b -> Bool
+  similar _ 0 0 = True
+  similar (realToFrac -> b) (realToFrac -> x) (realToFrac -> y) =
+      -- As b ↘ 1, epsilon ↘ 0
+      let epsilon = (x :: Double) / (exp 1 * logBase b (x + 1))
+          (lo,hi) = (x - epsilon,x + epsilon)
+      in lo <= y && y <= hi
+
+instance Similar Double
+instance Similar Float
+instance Similar Int
+instance Similar Integer
+instance Similar Int64
+instance Similar Int32
+instance Similar Int16
+instance Similar Int8
+instance Similar Word64
+instance Similar Word32
+instance Similar Word16
+instance Similar Word8
+
+instance Similar Duration where
+  similar b (Micros d) (Micros d') = similar b d d'
 
 {-# INLINE dissimilar #-}
-dissimilar :: (Real a, Real b) => a -> b -> b -> Bool
+dissimilar :: (Real a, Similar b) => a -> b -> b -> Bool
 dissimilar b x y = not (similar b x y)
 
 {-# INLINE e #-}
 e :: Floating a => a
 e = exp 1
+
+class Improving a where
+  improving :: a -> a -> Bool
+  improvingShow :: a -> String
+  default improving :: (Real a) => a -> a -> Bool
+  improving a b = a < b -- monotonically increasing as default
+  default improvingShow :: (Real a) => a -> String
+  improvingShow _ = "<"
 
 class Pretty a where
   pretty :: a -> String
@@ -166,111 +195,150 @@ class Pretty a where
 instance Pretty [Char] where
   pretty = id
 
--- Store duration as microseconds, not fractional seconds!
-newtype Duration = Duration { micros :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON)
+class Time a where
+  toTime :: Double -> a
+  fromTime :: a -> Double
+
+newtype CPUTime = CPUTime { cpuTime :: Double }
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
+instance Time CPUTime where
+  toTime = CPUTime
+  fromTime = cpuTime
+instance Improving CPUTime where
+  improving d1 d2 = d1 < d2 -- we want more CPUTime and less wall time
+  improvingShow _ = "<"
+instance Pretty CPUTime where
+    pretty (CPUTime d)
+        | d < 0.001    = printf     "%.0fμs" (d * 1000000)
+        | d < 1        = printf     "%.2fms" (d * 1000)
+        | d < 60       = printf     "%.2fs"   d
+        | d < 60^2     = printf "%.0fm %ds"  (d / 60)   (roundi d `mod` 60)
+        | otherwise    = printf "%.0fh %dm"  (d / 60^2) (roundi d `mod` 60^2)
+      where
+        roundi :: Double -> Int
+        roundi = round
+
+newtype Duration = Duration { duration :: Double }
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
+instance Time Duration where
+  toTime = Duration
+  fromTime = duration
+instance Improving Duration where
+  improving d1 d2 = d1 > d2 -- less time is better
+  improvingShow _ = ">"
 instance Pretty Duration where
-    pretty (Duration micros)
-        | micros < 1          = printf "%.2fns" (micros * 1000)
-        | micros < 1000       = printf "%.2fμs" micros
-        | micros < 1000000    = printf "%.2fms" (micros / 1000)
-        | micros < 60000000   = printf "%.2fs" (micros / 1000000)
-        | micros < 60000000^2 = printf "%dm %ds" (micros / 60000000) ((round micros :: Integer) `mod` 60000000)
-        | otherwise           = printf "%dh %dm" (micros / 60000000^2) ((round micros :: Integer) `mod` 60000000^2)
+    pretty (Duration d)
+        | d < 0.001    = printf     "%.0fμs" (d * 1000000)
+        | d < 1        = printf     "%.2fms" (d * 1000)
+        | d < 60       = printf     "%.2fs"   d
+        | d < 60^2     = printf "%.0fm %ds"  (d / 60)   (roundi d `mod` 60)
+        | otherwise    = printf "%.0fh %dm"  (d / 60^2) (roundi d `mod` 60^2)
+      where
+        roundi :: Double -> Int
+        roundi = round
 
-dFromS :: Double -> Duration
-dFromS = Duration . (1000000 *)
+pattern Minutes :: Time t => Double -> t
+pattern Minutes s <- ((/60) . fromTime -> s) where
+  Minutes s = toTime (s * 60000000)
 
-pattern Minutes :: Double -> Duration
-pattern Minutes s <- Duration ((/60000000) -> s) where
-  Minutes s = Duration (s * 60000000)
+pattern Seconds :: Time t => Double -> t
+pattern Seconds s <- (fromTime -> s) where
+  Seconds s = toTime (s * 1000000)
 
-pattern Seconds :: Double -> Duration
-pattern Seconds s <- Duration ((/1000000) -> s) where
-  Seconds s = Duration (s * 1000000)
+pattern Millis :: Time t => Double -> t
+pattern Millis s <- ((* 1000) . fromTime -> s) where
+  Millis s = toTime (s / 1000)
 
-pattern Millis :: Double -> Duration
-pattern Millis s <- Duration ((/1000) -> s) where
-  Millis s = Duration (s * 1000)
-
-pattern Micros :: Double -> Duration
-pattern Micros s <- Duration s where
-  Micros s = Duration s
-
-pattern Nanos :: Double -> Duration
-pattern Nanos s <- Duration ((* 1000) -> s) where
-  Nanos s = Duration (s / 1000)
+pattern Micros :: Time t => Double -> t
+pattern Micros s <- ((* 1000000) . fromTime -> s) where
+  Micros s = toTime (s / 1000000)
 
 newtype Bytes = Bytes { getBytes :: Int64 }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show)
+instance Improving Bytes where
+  improving b1 b2 = b1 > b2 -- fewer bytes are better
+  improvingShow _ = ">"
 instance Pretty Bytes where
     pretty (Bytes b)
-        | b < 2^10  = printf "%d B/s"  b
-        | b < 2^20  = printf "%d KB/s" (b `div` 2^10)
-        | b < 2^30  = printf "%d MB/s" (b `div` 2^20)
-        | otherwise = printf "%d GB/s" (b `div` 2^30)
+        | b < 2^10  = printf "%d B" b
+        | b < 2^20  = printf "%.1f KB" (realToFrac b / 2^10 :: Double)
+        | b < 2^30  = printf "%.1f MB" (realToFrac b / 2^20 :: Double)
+        | b < 2^40  = printf "%.1f GB" (realToFrac b / 2^30 :: Double)
+        | otherwise = printf "%.1f TB" (realToFrac b / 2^40 :: Double)
+instance Similar Bytes
 
 newtype Throughput = Throughput { getThroughput :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
+instance Improving Throughput -- more throughput is better
 instance Pretty Throughput where
     pretty (Throughput t)
-        | t < 2^10  = printf "%d B" t
-        | t < 2^20  = printf "%d KB" (round t `div` 2^10 :: Int64)
-        | t < 2^30  = printf "%d MB" (round t `div` 2^20 :: Int64)
-        | t < 2^40  = printf "%d GB" (round t `div` 2^30 :: Int64)
-        | otherwise = printf "%d TB" (round t `div` 2^40 :: Int64)
+        | t < 2^10  = printf "%d B/s"  (round t :: Integer)
+        | t < 2^20  = printf "%.1f KB/s" (t / 2^10)
+        | t < 2^30  = printf "%.1f MB/s" (t / 2^20)
+        | otherwise = printf "%.1f GB/s" (t / 2^30)
+instance Similar Throughput
 
-newtype Count = Count { getCount :: Int64 }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
-instance Pretty Count where
-  pretty (Count c) = show c
+newtype Collections = Collections { getCollections :: Int64 }
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show)
+instance Improving Collections where
+  improving c1 c2 = c1 > c2
+  improvingShow _ = ">"
+instance Similar Collections
+instance Pretty Collections where
+  pretty (Collections c) = show c
 
+-- Not specific enough to have an Improving instance;
+-- An improvement in one percentage value implies a
+-- relative worsening of another.
 newtype Percent = Percent { getPercent :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
 instance Pretty Percent where
-  pretty (Percent p) = printf "%.2f%%" p
-percent :: Double -> Percent
-percent = Percent . (*100)
+  pretty (Percent p) = printf "%.2f%%" (p * 100)
 
 newtype Factor = Factor { getFactor :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
+instance Improving Factor -- larger factor is better
 instance Pretty Factor where
   pretty (Factor f) = printf "%.2fx" f
 
 {-# INLINE calculate #-}
 calculate :: String -> GCStats -> GCStats -> BenchResult
 calculate label before after =
-    let cpuElapsed = dFromS $ wallSeconds after - wallSeconds before
-        cpuTime    = dFromS $ cpuSeconds after - cpuSeconds before
+    let cpuElapsed = wallSeconds after - wallSeconds before
+        cpuTime    = cpuSeconds after - cpuSeconds before
 
         cpu =
-          let elapsed = cpuElapsed
-              time    = cpuTime
-              factor  = realToFrac time / realToFrac elapsed
+          let elapsed = Duration cpuElapsed
+              time    = Duration cpuTime
+              factor  = Factor (cpuTime / cpuElapsed)
           in CPU {..}
 
         gc =
-          let elapsed = dFromS $ gcWallSeconds after - gcWallSeconds before
-              time    = dFromS $ gcCpuSeconds after - gcCpuSeconds before
-              factor  = realToFrac time / realToFrac elapsed
-              effect  = realToFrac cpuElapsed / realToFrac elapsed
-              burden  = realToFrac cpuTime / realToFrac time
+          let e = gcWallSeconds after - gcWallSeconds before
+              t = gcCpuSeconds after - gcCpuSeconds before
+              elapsed = Duration e
+              time    = Duration t
+              factor  = Factor (t / e)
+              effect  = Percent (e / cpuElapsed)
+              burden  = Percent (t / cpuTime)
               bytes   = Bytes $ bytesCopied after - bytesCopied before
-              rate    = realToFrac bytes / realToFrac (elapsed / 1000000)
-              work    = realToFrac bytes / realToFrac (time / 1000000)
-              colls   = Count $ numGcs after - numGcs before - 1
-              live    = Bytes $ currentBytesUsed after - currentBytesUsed before
+              rate    = Throughput $ realToFrac bytes / e
+              work    = Throughput $ realToFrac bytes / t
+              colls   = Collections $ numGcs after - numGcs before - 1
+              live    = Bytes $ currentBytesUsed after - currentBytesUsed before - _GCStats_size
           in GC {..}
 
         mut =
-          let elapsed = dFromS $ mutatorWallSeconds after - mutatorWallSeconds before
-              time    = dFromS $ mutatorCpuSeconds after - mutatorCpuSeconds before
-              factor  = realToFrac time / realToFrac elapsed
-              effect  = realToFrac cpuElapsed / realToFrac elapsed
-              burden  = realToFrac cpuTime / realToFrac time
-              bytes   = Bytes $ bytesAllocated after - bytesAllocated before - _GCStats_size - 1296
-              rate    = realToFrac bytes / realToFrac (elapsed / 1000000)
-              work    = realToFrac bytes / realToFrac (time / 1000000)
+          let e = mutatorWallSeconds after - mutatorWallSeconds before
+              t = mutatorCpuSeconds after - mutatorCpuSeconds before
+              elapsed = Duration e
+              time    = Duration t
+              factor  = Factor (t / e)
+              effect  = Percent (e / cpuElapsed)
+              burden  = Percent (t / cpuTime)
+              bytes   = Bytes $ bytesAllocated after - bytesAllocated before - _GCStats_size
+              rate    = Throughput $ realToFrac bytes / e
+              work    = Throughput $ realToFrac bytes / t
           in MUT {..}
 
     in BenchResult {..}
@@ -292,7 +360,7 @@ data Capability
         , bytes        :: {-# UNPACK #-}!Bytes      -- ^ bytes copied
         , rate         :: {-# UNPACK #-}!Throughput -- ^ bytes copied / wall
         , work         :: {-# UNPACK #-}!Throughput -- ^ bytes copied / cpu
-        , colls        :: {-# UNPACK #-}!Count      -- ^ number of GCs
+        , colls        :: {-# UNPACK #-}!Collections-- ^ number of GCs
         , live         :: {-# UNPACK #-}!Bytes      -- ^ active bytes after
         }
    | MUT
@@ -308,205 +376,161 @@ data Capability
    -- Pretend GC is not parallel for now
    -- | Par
    --      { }
-   deriving (Generic, Read, Show, Eq, ToJSON, FromJSON)
+   deriving (Generic, Read, Show, Eq)
 
 data BenchResult = BenchResult
     { label      :: !String
-    , cpu        :: {-# UNPACK #-}!Capability
-    , mut        :: {-# UNPACK #-}!Capability
-    , gc         :: {-# UNPACK #-}!Capability
-    } deriving (Generic, Read, Show, Eq, ToJSON, FromJSON)
+    , cpu        :: !Capability
+    , mut        :: !Capability
+    , gc         :: !Capability
+    } deriving (Generic, Read, Show, Eq)
 
 instance Pretty BenchResult where
     pretty BenchResult {..} =
         unlines
             [ ""
             , header
+            , divider
             , cpuTimeStats
             , mutTimeStats
             , gcTimeStats
             , ""
-            , "GC:"       <> p   collections   <> p "MUT:"
-            , "  Bytes: " <> p ( bytes    gc ) <> "    Bytes:" <> p ( bytes mut )
-            , "  Rate:  " <> p ( rate     gc ) <> "    Rate: " <> p ( rate  mut )
-            , "  Work:  " <> p ( work     gc ) <> "    Work: " <> p ( work  mut )
-            , "  Live:  " <> p ( live     gc )
+            , "Collections:" <> pad 7 (pretty (colls gc))
+            , "Leftover:   " <> pad 7 (pretty (live gc))
             ]
       where
-        header = "          Elapsed |"
-                 <> "          Time |"
-                 <> " Elapsed/Total |"
-                 <> "    Time/Total |"
-                 <> "       Speedup"
+        header = "            Time |"
+                  <> "    Relative |"
+                  <> "       Bytes |"
+                  <> "    Throughput"
 
-        collections = "(" <> p (colls gc) <> " GCs)"
+        divider = "     -------------------------------------------------------"
 
         cpuTimeStats =
-          "CPU:"    <> p ( elapsed cpu )
-            <> "  " <> p ( time    cpu )
-            <> "  " <> pad ""
-            <> "  " <> pad ""
-            <> "  " <> p ( factor  cpu )
+          "CPU:"    <> p ( time    cpu )
 
         mutTimeStats =
-          "MUT:"    <> p ( elapsed mut )
-            <> "  " <> p ( time    mut )
-            <> "  " <> p ( effect  mut )
+          "MUT:"    <> p ( time    mut )
             <> "  " <> p ( burden  mut )
-            <> "  " <> p ( factor  mut )
+            <> "  " <> p ( bytes   mut )
+            <> "  " <> pad 14 (pretty ( work    mut ))
 
         gcTimeStats =
-          "GC: "    <> p ( elapsed gc )
-            <> "  " <> p ( time    gc )
-            <> "  " <> p ( effect  gc )
+          "GC: "    <> p ( time    gc )
             <> "  " <> p ( burden  gc )
-            <> "  " <> p ( factor  gc )
+            <> "  " <> p ( bytes   gc )
+            <> "  " <> pad 14 (pretty ( work    gc ))
 
         p :: forall p. Pretty p => p -> String
-        p = pad . pretty
+        p = pad 12 . pretty
 
-        pad :: String -> String
-        pad s =
+        pad :: Int -> String -> String
+        pad n s =
           let l = length s
-          in replicate (14 - l) ' ' <> s
+          in replicate (n - l) ' ' <> s
+
+
+
+prettyVerbose BenchResult {..} =
+    unlines
+        [ ""
+        , header
+        , divider
+        , cpuTimeStats
+        , mutTimeStats
+        , gcTimeStats
+        , ""
+        , "GC:                      MUT:"
+        , "  Bytes: " <> pad 12 (pretty (bytes gc)) <> pad 12 "Bytes:" <> pad 12 (pretty ( bytes mut ))
+        , "  Rate:  " <> pad 12 (pretty (rate  gc)) <> pad 12 "Rate: " <> pad 12 (pretty ( rate  mut ))
+        , "  Work:  " <> pad 12 (pretty (work  gc)) <> pad 12 "Work: " <> pad 12 (pretty ( work  mut ))
+        , "  Live:  " <> pad 12 (pretty (live  gc))
+        , "  GCs:   " <> pad 12 (pretty (colls gc))
+        ]
+  where
+    header = "         (E)lapsed |"
+              <> "        (T)ime |"
+              <> "     (E)/Total |"
+              <> "     (T)/Total |"
+              <> "       Speedup"
+
+    divider = "     -----------------------------------------------------------------------------"
+
+    cpuTimeStats =
+      "CPU:"    <> p ( elapsed cpu )
+        <> "  " <> p ( time    cpu )
+        <> "  " <> pad 14 ""
+        <> "  " <> pad 14 ""
+        <> "  " <> p ( factor  cpu )
+
+    mutTimeStats =
+      "MUT:"    <> p ( elapsed mut )
+        <> "  " <> p ( time    mut )
+        <> "  " <> p ( effect  mut )
+        <> "  " <> p ( burden  mut )
+        <> "  " <> p ( factor  mut )
+
+    gcTimeStats =
+      "GC: "    <> p ( elapsed gc )
+        <> "  " <> p ( time    gc )
+        <> "  " <> p ( effect  gc )
+        <> "  " <> p ( burden  gc )
+        <> "  " <> p ( factor  gc )
+
+    p :: forall p. Pretty p => p -> String
+    p = pad 14 . pretty
+
+    pad :: Int -> String -> String
+    pad n s =
+      let l = length s
+      in replicate (n - l) ' ' <> s
 
 type BenchPred a = a -> BenchResult -> BenchResult -> Bool
 
-{-# INLINE faster #-}
-faster :: Real a => BenchPred a
-faster
-  base
-  ((elapsed . cpu) -> b1)
-  ((elapsed . cpu) -> b2) =
-    b1 < b2 && not (similar base b1 b2)
+data Feature = Garbage | GCs | Clock | Allocs | Mutation
+  deriving (Eq,Show,Ord,Read,Enum)
 
-{-# INLINE slower #-}
-slower :: Real a => BenchPred a
-slower base = flip (faster base)
+data Predicate
+  = forall b. (Real b) => Feature :>  b
+  | forall b. (Real b) => Feature :>= b
+  | forall b. (Real b) => Feature :=  b
+  | forall b. (Real b) => Feature :<= b
+  | forall b. (Real b) => Feature :<  b
 
-{-# INLINE fewerAllocations #-}
-fewerAllocations :: Real a => BenchPred a
-fewerAllocations
-  base
-  ((bytes . mut) -> b1)
-  ((bytes . mut) -> b2) =
-    b1 < b2 && not (similar base b1 b2)
+data SomeImprovingComparable
+  = forall a. (Improving a, Similar a, Pretty a) => SIC (BenchResult -> a)
 
-{-# INLINE moreAllocations #-}
-moreAllocations :: Real a => BenchPred a
-moreAllocations base = flip (fewerAllocations base)
+data Retries = Retries Int | NoRetries
 
-{-# INLINE fasterAllocations #-}
-fasterAllocations :: Real a => BenchPred a
-fasterAllocations
-  base
-  ((rate . mut) -> b1)
-  ((rate . mut) -> b2) =
-    b1 > b2 && not (similar base b1 b2)
-
-{-# INLINE slowerAllocations #-}
-slowerAllocations :: Real a => BenchPred a
-slowerAllocations base = flip (fasterAllocations base)
-
-{-# INLINE fewerGCs #-}
-fewerGCs :: Real a => BenchPred a
-fewerGCs
-  base
-  ((colls . gc) -> b1)
-  ((colls . gc) -> b2) =
-    b1 < b2 && not (similar base b1 b2)
-
-{-# INLINE moreGCs #-}
-moreGCs :: Real a => BenchPred a
-moreGCs base = flip (fewerGCs base)
-
-{-# INLINE lessGC #-}
-lessGC :: Real a => BenchPred a
-lessGC
-  base
-  ((elapsed . gc) -> b1)
-  ((elapsed . gc) -> b2) =
-    b1 < b2 && not (similar base b1 b2)
-
-{-# INLINE moreGC #-}
-moreGC :: Real a => BenchPred a
-moreGC base = flip (lessGC base)
-
-{-# INLINE betterUtilization #-}
-betterUtilization :: Real a => BenchPred a
-betterUtilization base b1 b2 =
-  (work $ gc b1) < (work $ gc b2) &&
-  (work $ mut b1) < (work $ mut b2) &&
-  dissimilar base (work $ gc b1) (work $ gc b2) &&
-  dissimilar base (work $ mut b1) (work $ mut b2)
-
-{-# INLNE moreConservative #-}
-moreConservative :: Real a => BenchPred a
-moreConservative base b1 b2 =
-  (bytes $ gc b1) < (bytes $ gc b2) &&
-  (bytes $ mut b1) < (bytes $ mut b2) &&
-  dissimilar base (bytes $ gc b1) (bytes $ gc b2) &&
-  dissimilar base (bytes $ mut b1) (bytes $ mut b2)
-
-{-# INLINE lessConservative #-}
-lessConservative :: Real a => BenchPred a
-lessConservative base = flip (moreConservative base)
-
-{-# INLINE lessGCThanMutation #-}
-lessGCThanMutation :: Real a => a -> BenchResult -> Bool
-lessGCThanMutation base b =
-  (bytes $ gc b) < (bytes $ mut b) &&
-  dissimilar base (bytes $ gc b) (bytes $ mut b)
-
--- instance Pretty (BenchResult,BenchResult) where
---     pretty (old,new) = do
---         unlines
---             [ ""
---             , header
---             , cpuStats
---             , mutStats
---             , gcStats
---             , ""
---             , "GC:"       <> p   collections   <> p "MUT:"
---             , "  Bytes: " <> p ( bytes    gc ) <> "    Bytes:" <> p ( bytes mut )
---             , "  Rate:  " <> p ( rate     gc ) <> "    Rate: " <> p ( rate  mut )
---             , "  Work:  " <> p ( work     gc ) <> "    Work: " <> p ( work  mut )
---             , "  Live:  " <> p ( live     gc )
---             ]
---       where
---         header = "          Elapsed |"
---                   <> "          Time |"
---                   <> " Elapsed/Total |"
---                   <> "    Time/Total |"
---                   <> "       Speedup"
-
---         collections = "(" <> p (colls gc) <> " GCs)"
-
---         cpuTimeStats =
---           "CPU:"    <> p ( elapsed cpu )
---             <> "  " <> p ( time    cpu )
---             <> "  " <> pad ""
---             <> "  " <> pad ""
---             <> "  " <> p ( factor  cpu )
-
---         mutTimeStats =
---           "MUT:"    <> p ( elapsed mut )
---             <> "  " <> p ( time    mut )
---             <> "  " <> p ( effect  mut )
---             <> "  " <> p ( burden  mut )
---             <> "  " <> p ( factor  mut )
-
---         gcTimeStats =
---           "GC: "    <> p ( elapsed gc )
---             <> "  " <> p ( time    gc )
---             <> "  " <> p ( effect  gc )
---             <> "  " <> p ( burden  gc )
---             <> "  " <> p ( factor  gc )
-
---         p = pad . pretty
-
---         pad :: String -> String
---         pad s =
---           let l = length s
---           in replicate (14 - l) ' ' <> s
-
+{-# INLINE constrain #-}
+constrain :: BenchResult -> BenchResult -> [Predicate] -> Test sync ()
+constrain br1 br2 =
+  mapM_ $ \p ->
+    let pred =
+          case p of
+            f :> b ->
+              (" :>",f,\(SIC s) -> improving (s br1) (s  br2) && not (similar b (s br1) (s br2)))
+            f :>= b ->
+              (" :>=",f,\(SIC s) -> improving (s br1) (s br2) || similar b (s br1) (s br2))
+            f := b ->
+              (" >=",f,\(SIC s) -> similar b (s br1) (s br2))
+            f :<= b ->
+              (" :<=",f,\(SIC s) -> improving (s br2) (s br1) || similar b (s br1) (s br2))
+            f :< b ->
+              (" :<",f,\(SIC s) -> improving (s br2) (s br1) && not (similar b (s br1) (s br2)))
+        selector f =
+          case f of
+            Garbage  -> SIC $ bytes   .  gc
+            GCs      -> SIC $ rate    .  gc
+            Clock    -> SIC $ elapsed . cpu
+            Allocs   -> SIC $ bytes   . mut
+            Mutation -> SIC $ rate    . mut
+    in case pred of
+        (sc,f,g) -> scope (show f ++ sc) $
+          let sel = selector f in
+          if g sel then
+            ok
+          else
+            case sel of
+              SIC s -> crash $
+                intercalate " " [ "Expecting:", pretty (s br1), improvingShow (s br1), pretty (s br2) ]

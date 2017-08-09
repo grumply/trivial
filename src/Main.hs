@@ -4,6 +4,6 @@ import Trivial
 
 main = do
   run $ forM_ [1..10] $ \i -> do
-    (_,r) <- bench (show i) $
-      return (foldr (+) 0 [1..i :: Int])
-    expect (r > 0)
+    let test = return (foldr (+) 0 [1..i :: Int])
+    bench (show i) test $ \(_,sum) ->
+      expect (sum > 0)
