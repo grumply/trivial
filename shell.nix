@@ -2,11 +2,13 @@
 
 let
 
+  trivial = import ../trivial/default.nix {};
+  inherit (trivial) t;
   inherit (nixpkgs) pkgs;
 
   f = { mkDerivation, async, base, containers, deepseq, directory
       , ghc-prim, hashable, managed, mtl, pretty-show, random, stdenv
-      , stm, template-haskell
+      , stm, template-haskell, trivial, unordered-containers
       }:
       mkDerivation {
         pname = "trivial";
@@ -16,11 +18,11 @@ let
         isExecutable = true;
         libraryHaskellDepends = [
           async base containers deepseq directory ghc-prim hashable managed
-          mtl pretty-show random stm template-haskell
+          mtl pretty-show random stm template-haskell trivial unordered-containers
         ];
         executableHaskellDepends = [
           async base containers deepseq directory ghc-prim hashable managed
-          mtl pretty-show random stm template-haskell
+          mtl pretty-show random stm template-haskell trivial unordered-containers
         ];
         homepage = "github.com/grumply/champ";
         description = "Simple benchmarking and Easy testing";
