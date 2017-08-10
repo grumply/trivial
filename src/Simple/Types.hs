@@ -1,83 +1,71 @@
+{-# LANGUAGE RankNTypes #-}
 module Simple.Types where
+
+import Simple.Internal.Base
+import Simple.Internal.Collections
+import Simple.Internal.Count
+import Simple.Internal.DataRate
+import Simple.Internal.Improving
+import Simple.Internal.Magnitude
+import Simple.Internal.Pretty
+import Simple.Internal.Similar
+import Simple.Internal.Space
+import Simple.Internal.Time
 
 {-# INLINE e #-}
 e :: Floating a => a
 e = exp 1
 
-newtype Throughput = Throughput { getThroughput :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
-instance Improving Throughput -- more throughput is better
-instance Pretty Throughput where
-    pretty (Throughput t)
-        | t < 2^10  = printf "%d B/s"  (round t :: Integer)
-        | t < 2^20  = printf "%.1f KB/s" (t / 2^10)
-        | t < 2^30  = printf "%.1f MB/s" (t / 2^20)
-        | otherwise = printf "%.1f GB/s" (t / 2^30)
-instance Similar Throughput
 
-newtype Collections = Collections { getCollections :: Int64 }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show)
-instance Improving Collections where
-  improving c1 c2 = c1 > c2
-  improvingShow _ = ">"
-instance Similar Collections
-instance Pretty Collections where
-  pretty (Collections c) = show c
+data CPU = CPU
+    { cpuElapsed      :: {-# UNPACK #-}!Elapsed
+    , cputime         :: {-# UNPACK #-}!CPUTime   -- ^ CPU duration
+    } deriving (Generic, Read, Show, Eq)
 
--- Not specific enough to have an Improving instance;
--- An improvement in one percentage value implies a
--- relative worsening of another.
-newtype Percent = Percent { getPercent :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
-instance Pretty Percent where
-  pretty (Percent p) = printf "%.2f%%" (p * 100)
+instance HasElapsed CPU where
+  elapsed = cpuElapsed
 
-newtype Factor = Factor { getFactor :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
-instance Improving Factor -- larger factor is better
-instance Pretty Factor where
-  pretty (Factor f) = printf "%.2fx" f
+instance HasCPUTime CPU where
+  cpuTime = cputime
 
-data Capability
-  -- Sum type for the convenience of record punning
-  -- record accessors are non-total
-  = CPU
-        { elapsed      :: {-# UNPACK #-}!Duration   -- ^ wall clock duration
-        , time         :: {-# UNPACK #-}!Duration   -- ^ CPU duration
-        , factor       :: {-# UNPACK #-}!Factor     -- ^ wall / cpu
-        }
-   | GC
-        { elapsed      :: {-# UNPACK #-}!Duration   -- ^ wall clock duration
-        , time         :: {-# UNPACK #-}!Duration   -- ^ CPU duration
-        , factor       :: {-# UNPACK #-}!Factor     -- ^ wall / cpu
-        , effect       :: {-# UNPACK #-}!Percent    -- ^ impact on wall
-        , burden       :: {-# UNPACK #-}!Percent    -- ^ impact on cpu
-        , bytes        :: {-# UNPACK #-}!Bytes      -- ^ bytes copied
-        , rate         :: {-# UNPACK #-}!Throughput -- ^ bytes copied / wall
-        , work         :: {-# UNPACK #-}!Throughput -- ^ bytes copied / cpu
-        , colls        :: {-# UNPACK #-}!Collections-- ^ number of GCs
-        , live         :: {-# UNPACK #-}!Bytes      -- ^ active bytes after
-        }
-   | MUT
-        { elapsed      :: {-# UNPACK #-}!Duration   -- ^ wall clock duration
-        , time         :: {-# UNPACK #-}!Duration   -- ^ CPU duration
-        , factor       :: {-# UNPACK #-}!Factor     -- ^ wall / cpu
-        , effect       :: {-# UNPACK #-}!Percent    -- ^ impact on wall
-        , burden       :: {-# UNPACK #-}!Percent    -- ^ impact on cpu
-        , bytes        :: {-# UNPACK #-}!Bytes      -- ^ bytes allocated
-        , rate         :: {-# UNPACK #-}!Throughput -- ^ bytes allocated / wall
-        , work         :: {-# UNPACK #-}!Throughput -- ^ bytes allocated / cpu
-        }
-   -- Pretend GC is not parallel for now
-   -- | Par
-   --      { }
-   deriving (Generic, Read, Show, Eq)
+data GC = GC
+    { gcElapsed    :: {-# UNPACK #-}!Elapsed
+    , gcTime       :: {-# UNPACK #-}!CPUTime
+    , copyRate     :: {-# UNPACK #-}!CopyRate
+    , collections  :: {-# UNPACK #-}!Collections
+    , uncollected  :: {-# UNPACK #-}!Bytes
+    , copied       :: {-# UNPACK #-}!Copied
+    , slop         :: {-# UNPACK #-}!Slop
+    } deriving (Generic, Read, Show, Eq)
+
+instance HasElapsed GC where
+  elapsed = gcElapsed
+
+instance HasCPUTime GC where
+  cpuTime = gcTime
+
+data MUT = MUT
+    { mutElapsed      :: {-# UNPACK #-}!Elapsed
+    , mutTime         :: {-# UNPACK #-}!CPUTime
+    , alloc           :: {-# UNPACK #-}!Allocation
+    , mutated         :: {-# UNPACK #-}!Mutated
+    , peak            :: {-# UNPACK #-}!Peak
+    , used            :: {-# UNPACK #-}!Used
+    , cumulative      :: {-# UNPACK #-}!Cumulative
+    , maxBytes        :: {-# UNPACK #-}!Max
+    } deriving (Generic, Read, Show, Eq)
+
+instance HasElapsed MUT where
+  elapsed = mutElapsed
+
+instance HasCPUTime MUT where
+  cpuTime = mutTIme
 
 data BenchResult = BenchResult
     { label      :: !String
-    , cpu        :: !Capability
-    , mut        :: !Capability
-    , gc         :: !Capability
+    , cpu        :: !CPU
+    , mut        :: !MUT
+    , gc         :: !GC
     } deriving (Generic, Read, Show, Eq)
 
 instance Pretty BenchResult where
@@ -177,4 +165,3 @@ prettyVerbose BenchResult {..} =
     pad n s =
       let l = length s
       in replicate (n - l) ' ' <> s
-

@@ -67,12 +67,12 @@ pattern Nanoseconds s <- (round . (* 1000000000) . getSeconds . fromTime -> s) w
 ----------------------------------------
 -- Elapsed time; wall clock
 
-newtype Elapsed = Elapsed { getElapsed :: Time }
+newtype Elapsed = Elapsed Time
   deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
 
 instance IsTime Elapsed where
   toTime = Elapsed
-  fromTime = getElapsed
+  fromTime (Elapsed e) = e
 
 instance Improving Elapsed where
   improving old new = old > new -- less time is better
@@ -86,15 +86,19 @@ instance Base Elapsed where
 instance Similar Elapsed where
   similar b (Milliseconds d) (Milliseconds d') = similar b d d'
 
+
+class HasElapsed a where
+  elapsed :: a -> Elapsed
+
 ----------------------------------------
 -- CPUTime; cpu clock
 
-newtype CPUTime = CPUTime { getCPUTime :: Time }
+newtype CPUTime = CPUTime Time
   deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
 
 instance IsTime CPUTime where
   toTime = CPUTime
-  fromTime = getCPUTime
+  fromTime (CPUTime cput) = cput
 
 instance Improving CPUTime where
   improving old new = old > new
@@ -104,3 +108,7 @@ instance Base CPUTime
 
 instance Similar CPUTime where
   similar b (Microseconds us) (Microseconds us') = similar b us us'
+
+class HasCPUTime a where
+  cpuTime :: a -> CPUTime
+
