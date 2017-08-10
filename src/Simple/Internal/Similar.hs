@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DefaultSignatures #-}
 module Simple.Internal.Similar where
 

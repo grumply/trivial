@@ -1,167 +1,76 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
-module Simple.Types where
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
+module Simple.Types (module Simple.Types, module Export) where
 
-import Simple.Internal.Base
-import Simple.Internal.Collections
-import Simple.Internal.Count
-import Simple.Internal.DataRate
-import Simple.Internal.Improving
-import Simple.Internal.Magnitude
-import Simple.Internal.Pretty
-import Simple.Internal.Similar
-import Simple.Internal.Space
-import Simple.Internal.Time
+import Simple.Internal.Base as Export
+import Simple.Internal.Count as Export
+import Simple.Internal.DataRate as Export
+import Simple.Internal.Improving as Export
+import Simple.Internal.Magnitude as Export
+import Simple.Internal.Pretty as Export
+import Simple.Internal.Rate as Export
+import Simple.Internal.Similar as Export
+import Simple.Internal.Space as Export
+import Simple.Internal.Time as Export
+import Simple.Internal.Percent as Export
+import Simple.Internal as Export
 
 {-# INLINE e #-}
 e :: Floating a => a
 e = exp 1
 
+-- prettyVerbose BenchResult {..} =
+--     unlines
+--         [ ""
+--         , header
+--         , divider
+--         , cpuTimeStats
+--         , mutTimeStats
+--         , gcTimeStats
+--         , ""
+--         , "GC:                      MUT:"
+--         , "  Bytes: " <> pad 12 (pretty (bytes gc)) <> pad 12 "Bytes:" <> pad 12 (pretty ( bytes mut ))
+--         , "  Rate:  " <> pad 12 (pretty (rate  gc)) <> pad 12 "Rate: " <> pad 12 (pretty ( rate  mut ))
+--         , "  Work:  " <> pad 12 (pretty (work  gc)) <> pad 12 "Work: " <> pad 12 (pretty ( work  mut ))
+--         , "  Live:  " <> pad 12 (pretty (live  gc))
+--         , "  GCs:   " <> pad 12 (pretty (colls gc))
+--         ]
+--   where
+--     header = "         (E)lapsed |"
+--               <> "        (T)ime |"
+--               <> "     (E)/Total |"
+--               <> "     (T)/Total |"
+--               <> "       Speedup"
 
-data CPU = CPU
-    { cpuElapsed      :: {-# UNPACK #-}!Elapsed
-    , cputime         :: {-# UNPACK #-}!CPUTime   -- ^ CPU duration
-    } deriving (Generic, Read, Show, Eq)
+--     divider = "     -----------------------------------------------------------------------------"
 
-instance HasElapsed CPU where
-  elapsed = cpuElapsed
+--     cpuTimeStats =
+--       "CPU:"    <> p ( elapsed cpu )
+--         <> "  " <> p ( time    cpu )
+--         <> "  " <> pad 14 ""
+--         <> "  " <> pad 14 ""
+--         <> "  " <> p ( factor  cpu )
 
-instance HasCPUTime CPU where
-  cpuTime = cputime
+--     mutTimeStats =
+--       "MUT:"    <> p ( elapsed mut )
+--         <> "  " <> p ( time    mut )
+--         <> "  " <> p ( effect  mut )
+--         <> "  " <> p ( burden  mut )
+--         <> "  " <> p ( factor  mut )
 
-data GC = GC
-    { gcElapsed    :: {-# UNPACK #-}!Elapsed
-    , gcTime       :: {-# UNPACK #-}!CPUTime
-    , copyRate     :: {-# UNPACK #-}!CopyRate
-    , collections  :: {-# UNPACK #-}!Collections
-    , uncollected  :: {-# UNPACK #-}!Bytes
-    , copied       :: {-# UNPACK #-}!Copied
-    , slop         :: {-# UNPACK #-}!Slop
-    } deriving (Generic, Read, Show, Eq)
+--     gcTimeStats =
+--       "GC: "    <> p ( elapsed gc )
+--         <> "  " <> p ( time    gc )
+--         <> "  " <> p ( effect  gc )
+--         <> "  " <> p ( burden  gc )
+--         <> "  " <> p ( factor  gc )
 
-instance HasElapsed GC where
-  elapsed = gcElapsed
+--     p :: forall p. Pretty p => p -> String
+--     p = pad 14 . pretty
 
-instance HasCPUTime GC where
-  cpuTime = gcTime
-
-data MUT = MUT
-    { mutElapsed      :: {-# UNPACK #-}!Elapsed
-    , mutTime         :: {-# UNPACK #-}!CPUTime
-    , alloc           :: {-# UNPACK #-}!Allocation
-    , mutated         :: {-# UNPACK #-}!Mutated
-    , peak            :: {-# UNPACK #-}!Peak
-    , used            :: {-# UNPACK #-}!Used
-    , cumulative      :: {-# UNPACK #-}!Cumulative
-    , maxBytes        :: {-# UNPACK #-}!Max
-    } deriving (Generic, Read, Show, Eq)
-
-instance HasElapsed MUT where
-  elapsed = mutElapsed
-
-instance HasCPUTime MUT where
-  cpuTime = mutTIme
-
-data BenchResult = BenchResult
-    { label      :: !String
-    , cpu        :: !CPU
-    , mut        :: !MUT
-    , gc         :: !GC
-    } deriving (Generic, Read, Show, Eq)
-
-instance Pretty BenchResult where
-    pretty BenchResult {..} =
-        unlines
-            [ ""
-            , header
-            , divider
-            , cpuTimeStats
-            , mutTimeStats
-            , gcTimeStats
-            , ""
-            , "Collections:" <> pad 7 (pretty (colls gc))
-            , "Leftover:   " <> pad 7 (pretty (live gc))
-            ]
-      where
-        header = "            Time |"
-                  <> "    Relative |"
-                  <> "       Bytes |"
-                  <> "    Throughput"
-
-        divider = "     -------------------------------------------------------"
-
-        cpuTimeStats =
-          "CPU:"    <> p ( time    cpu )
-
-        mutTimeStats =
-          "MUT:"    <> p ( time    mut )
-            <> "  " <> p ( burden  mut )
-            <> "  " <> p ( bytes   mut )
-            <> "  " <> pad 14 (pretty ( work    mut ))
-
-        gcTimeStats =
-          "GC: "    <> p ( time    gc )
-            <> "  " <> p ( burden  gc )
-            <> "  " <> p ( bytes   gc )
-            <> "  " <> pad 14 (pretty ( work    gc ))
-
-        p :: forall p. Pretty p => p -> String
-        p = pad 12 . pretty
-
-        pad :: Int -> String -> String
-        pad n s =
-          let l = length s
-          in replicate (n - l) ' ' <> s
-
-prettyVerbose BenchResult {..} =
-    unlines
-        [ ""
-        , header
-        , divider
-        , cpuTimeStats
-        , mutTimeStats
-        , gcTimeStats
-        , ""
-        , "GC:                      MUT:"
-        , "  Bytes: " <> pad 12 (pretty (bytes gc)) <> pad 12 "Bytes:" <> pad 12 (pretty ( bytes mut ))
-        , "  Rate:  " <> pad 12 (pretty (rate  gc)) <> pad 12 "Rate: " <> pad 12 (pretty ( rate  mut ))
-        , "  Work:  " <> pad 12 (pretty (work  gc)) <> pad 12 "Work: " <> pad 12 (pretty ( work  mut ))
-        , "  Live:  " <> pad 12 (pretty (live  gc))
-        , "  GCs:   " <> pad 12 (pretty (colls gc))
-        ]
-  where
-    header = "         (E)lapsed |"
-              <> "        (T)ime |"
-              <> "     (E)/Total |"
-              <> "     (T)/Total |"
-              <> "       Speedup"
-
-    divider = "     -----------------------------------------------------------------------------"
-
-    cpuTimeStats =
-      "CPU:"    <> p ( elapsed cpu )
-        <> "  " <> p ( time    cpu )
-        <> "  " <> pad 14 ""
-        <> "  " <> pad 14 ""
-        <> "  " <> p ( factor  cpu )
-
-    mutTimeStats =
-      "MUT:"    <> p ( elapsed mut )
-        <> "  " <> p ( time    mut )
-        <> "  " <> p ( effect  mut )
-        <> "  " <> p ( burden  mut )
-        <> "  " <> p ( factor  mut )
-
-    gcTimeStats =
-      "GC: "    <> p ( elapsed gc )
-        <> "  " <> p ( time    gc )
-        <> "  " <> p ( effect  gc )
-        <> "  " <> p ( burden  gc )
-        <> "  " <> p ( factor  gc )
-
-    p :: forall p. Pretty p => p -> String
-    p = pad 14 . pretty
-
-    pad :: Int -> String -> String
-    pad n s =
-      let l = length s
-      in replicate (n - l) ' ' <> s
+--     pad :: Int -> String -> String
+--     pad n s =
+--       let l = length s
+--       in replicate (n - l) ' ' <> s

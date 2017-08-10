@@ -62,7 +62,9 @@ bench nm f w =
                 !after <- getGCStats
                 return (before, after, a)
         cs <- currentScope
-        let results = calculate cs before after
+        let results =
+              let r = mkBenchResult cs before after
+              in r { collections = (collections r) - toCount (Count 1) }
         w (results,a)
 
 -- | Given a scope, a list of BenchPreds partially applied to a base, a test to
@@ -139,48 +141,6 @@ persistBench br = do
     io $ createDirectoryIfMissing True dir
     io $ writeFile (dir <> show (abs $ hash cs)) (show br)
 
-{-# INLINE calculate #-}
-calculate :: String -> GCStats -> GCStats -> BenchResult
-calculate label before after =
-    let cpuElapsed = wallSeconds after - wallSeconds before
-        cpuTime    = cpuSeconds after - cpuSeconds before
-
-        cpu =
-          let elapsed = Duration cpuElapsed
-              time    = Duration cpuTime
-              factor  = Factor (cpuTime / cpuElapsed)
-          in CPU {..}
-
-        gc =
-          let e = gcWallSeconds after - gcWallSeconds before
-              t = gcCpuSeconds after - gcCpuSeconds before
-              elapsed = Duration e
-              time    = Duration t
-              factor  = Factor (t / e)
-              effect  = Percent (e / cpuElapsed)
-              burden  = Percent (t / cpuTime)
-              bytes   = Bytes $ bytesCopied after - bytesCopied before
-              rate    = Throughput $ realToFrac bytes / e
-              work    = Throughput $ realToFrac bytes / t
-              colls   = Collections $ numGcs after - numGcs before - 1
-              live    = Bytes $ currentBytesUsed after - currentBytesUsed before - _GCStats_size
-          in GC {..}
-
-        mut =
-          let e = mutatorWallSeconds after - mutatorWallSeconds before
-              t = mutatorCpuSeconds after - mutatorCpuSeconds before
-              elapsed = Duration e
-              time    = Duration t
-              factor  = Factor (t / e)
-              effect  = Percent (e / cpuElapsed)
-              burden  = Percent (t / cpuTime)
-              bytes   = Bytes $ bytesAllocated after - bytesAllocated before - _GCStats_size
-              rate    = Throughput $ realToFrac bytes / e
-              work    = Throughput $ realToFrac bytes / t
-          in MUT {..}
-
-    in BenchResult {..}
-
 type BenchPred a = a -> BenchResult -> BenchResult -> Bool
 
 data Feature = Garbage | GCs | Clock | Allocs | Mutation
@@ -214,11 +174,11 @@ constrain br1 br2 =
               (" :<",f,\(SIC s) -> improving (s br2) (s br1) && not (similar b (s br1) (s br2)))
         selector f =
           case f of
-            Garbage  -> SIC $ bytes   .  gc
-            GCs      -> SIC $ rate    .  gc
-            Clock    -> SIC $ elapsed . cpu
-            Allocs   -> SIC $ bytes   . mut
-            Mutation -> SIC $ rate    . mut
+            Garbage  -> SIC $ copied
+            GCs      -> SIC $ collections
+            Clock    -> SIC $ cpuElapsed
+            Allocs   -> SIC $ alloc
+            Mutation -> SIC $ 
     in case pred of
         (sc,f,g) -> scope (show f ++ sc) $
           let sel = selector f in

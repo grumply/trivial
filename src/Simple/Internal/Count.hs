@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -17,20 +18,32 @@ import GHC.Generics
 
 import Text.Printf
 
-newtype Count = Count { getCount :: Int64 }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Integral,Enum,Base,Similar)
+import Data.Aeson
 
+newtype SomeCount = SomeCount { getCount :: Int64 }
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Integral,Enum,Base,Similar,ToJSON,FromJSON)
+
+pattern Count :: IsCount c => Int64 -> c
+pattern Count c <- (getCount . fromCount -> c) where
+  Count c = toCount (SomeCount c)
+
+instance Pretty SomeCount where
+  pretty (SomeCount c) = show c
+
+instance IsCount Int64 where
+  toCount (SomeCount c) = c
+  fromCount = SomeCount
 
 class IsCount c where
-  toCount :: Count -> c
-  fromCount :: c -> Count
+  toCount :: SomeCount -> c
+  fromCount :: c -> SomeCount
 
-instance IsCount Count where
+instance IsCount SomeCount where
   toCount = id
   fromCount = id
 
-newtype ByteUsageSamples = ByteUsageSamples { getByteUsageSamples :: Count }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Integral,Enum,Base,Similar)
+newtype ByteUsageSamples = ByteUsageSamples { getByteUsageSamples :: SomeCount }
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Integral,Enum,Base,Similar,ToJSON,FromJSON)
 
 instance IsCount ByteUsageSamples where
   toCount = ByteUsageSamples
@@ -39,15 +52,15 @@ instance IsCount ByteUsageSamples where
 ----------------------------------------
 -- Collection Count
 
-newtype Collections = Collections { getCollections :: Count }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show)
+newtype Collections = Collections { getCollections :: SomeCount }
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
 
 instance IsCount Collections where
   toCount = Collections
   fromCount = getCollections
 
 instance Pretty Collections where
-  pretty (Collections c) = show c
+  pretty (Collections c) = pretty c
 
 instance Improving Collections where
   improving c1 c2 = c1 > c2

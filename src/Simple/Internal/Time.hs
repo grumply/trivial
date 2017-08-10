@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -15,8 +16,10 @@ import Text.Printf
 
 import Data.Int
 
+import Data.Aeson
+
 newtype Time = Time { getSeconds :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON)
 
 instance Pretty Time where
     pretty (Time d)
@@ -40,35 +43,35 @@ instance IsTime Time where
   toTime = id
   fromTime = id
 
-pattern Hours :: IsTime t => Int64 -> t
-pattern Hours s <- (round . (/60^2) . getSeconds . fromTime -> s) where
-  Hours (toTime . Time . (*60^2) . realToFrac -> s) = s
+pattern Hours :: IsTime t => Double -> t
+pattern Hours s <- ((/60^2) . getSeconds . fromTime -> s) where
+  Hours (toTime . Time . (*60^2) -> s) = s
 
-pattern Minutes :: IsTime t => Int64 -> t
-pattern Minutes s <- (round . (/60) . getSeconds . fromTime -> s) where
-  Minutes (toTime . Time . (*60) . realToFrac -> s) = s
+pattern Minutes :: IsTime t => Double -> t
+pattern Minutes s <- ((/60) . getSeconds . fromTime -> s) where
+  Minutes (toTime . Time . (*60) -> s) = s
 
-pattern Seconds :: IsTime t => Int64 -> t
-pattern Seconds s <- (round . getSeconds . fromTime -> s) where
-  Seconds (toTime . Time . realToFrac -> s) = s
+pattern Seconds :: IsTime t => Double -> t
+pattern Seconds s <- (getSeconds . fromTime -> s) where
+  Seconds (toTime . Time -> s) = s
 
-pattern Milliseconds :: IsTime t => Int64 -> t
-pattern Milliseconds s <- (round . (* 1000) . getSeconds . fromTime -> s) where
-  Milliseconds (toTime . Time . (/1000) . realToFrac -> s) = s
+pattern Milliseconds :: IsTime t => Double -> t
+pattern Milliseconds s <- ((* 1000) . getSeconds . fromTime -> s) where
+  Milliseconds (toTime . Time . (/1000) -> s) = s
 
-pattern Microseconds :: IsTime t => Int64 -> t
-pattern Microseconds s <- (round . (* 1000000) . getSeconds . fromTime -> s) where
-  Microseconds (toTime . Time . (/1000000) . realToFrac -> s) = s
+pattern Microseconds :: IsTime t => Double -> t
+pattern Microseconds s <- ((* 1000000) . getSeconds . fromTime -> s) where
+  Microseconds (toTime . Time . (/1000000) -> s) = s
 
-pattern Nanoseconds :: IsTime t => Int64 -> t
-pattern Nanoseconds s <- (round . (* 1000000000) . getSeconds . fromTime -> s) where
-  Nanoseconds (toTime . Time . (/1000000000) . realToFrac -> s) = s
+pattern Nanoseconds :: IsTime t => Double -> t
+pattern Nanoseconds s <- ((* 1000000000) . getSeconds . fromTime -> s) where
+  Nanoseconds (toTime . Time . (/1000000000) -> s) = s
 
 ----------------------------------------
 -- Elapsed time; wall clock
 
 newtype Elapsed = Elapsed Time
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON,Pretty)
 
 instance IsTime Elapsed where
   toTime = Elapsed
@@ -86,7 +89,6 @@ instance Base Elapsed where
 instance Similar Elapsed where
   similar b (Milliseconds d) (Milliseconds d') = similar b d d'
 
-
 class HasElapsed a where
   elapsed :: a -> Elapsed
 
@@ -94,7 +96,7 @@ class HasElapsed a where
 -- CPUTime; cpu clock
 
 newtype CPUTime = CPUTime Time
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON,Pretty)
 
 instance IsTime CPUTime where
   toTime = CPUTime
@@ -111,4 +113,3 @@ instance Similar CPUTime where
 
 class HasCPUTime a where
   cpuTime :: a -> CPUTime
-
