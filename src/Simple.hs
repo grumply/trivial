@@ -176,9 +176,9 @@ constrain br1 br2 =
           case f of
             Garbage  -> SIC $ copied
             GCs      -> SIC $ collections
-            Clock    -> SIC $ cpuElapsed
+            Clock    -> SIC $ cputime
             Allocs   -> SIC $ alloc
-            Mutation -> SIC $ 
+            Mutation -> SIC $ \a -> DataRate (alloc a) (cputime a) :: AllocationRate
     in case pred of
         (sc,f,g) -> scope (show f ++ sc) $
           let sel = selector f in

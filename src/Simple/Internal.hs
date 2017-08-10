@@ -36,7 +36,7 @@ mkBenchResult label before after =
         maxBytes    = Bytes (maxBytesUsed after)         - Bytes (maxBytesUsed before)
         gcElapsed   = Seconds (gcWallSeconds after)      - Seconds (gcWallSeconds before)
         gcTime      = Seconds (gcCpuSeconds after)       - Seconds (gcCpuSeconds before)
-        copyRate    = Throughput copied cpuElapsed
+        copyRate    = DataRate copied cpuElapsed
         collections = Count (numGcs after)               - Count (numGcs before)
         uncollected = Bytes (currentBytesUsed after)     - Bytes (currentBytesUsed before)
         copied      = Bytes (bytesCopied after)          - Bytes (bytesCopied before)
@@ -92,13 +92,13 @@ instance Pretty BenchResult where
           "MUT:"    <> p mutTime
             <> "  " <> p (mkPercent mutTime cputime)
             <> "  " <> p alloc
-            <> "  " <> pad 14 (pretty (Throughput alloc mutTime :: DataRate))
+            <> "  " <> pad 14 (pretty (DataRate alloc mutTime :: SomeDataRate))
 
         gcTimeStats =
           "GC: "    <> p gcTime
             <> "  " <> p (mkPercent gcTime cputime)
             <> "  " <> p copied
-            <> "  " <> pad 14 (pretty (Throughput copied gcTime :: DataRate))
+            <> "  " <> pad 14 (pretty (DataRate copied gcTime :: SomeDataRate))
 
         p :: forall p. Pretty p => p -> String
         p = pad 12 . pretty
