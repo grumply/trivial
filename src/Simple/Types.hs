@@ -15,6 +15,8 @@ import Simple.Internal.Similar as Export
 import Simple.Internal.Space as Export
 import Simple.Internal.Time as Export
 import Simple.Internal.Percent as Export
+import Simple.Internal.Utilities as Export
+import Simple.Internal.Variance as Export
 import Simple.Internal as Export
 
 {-# INLINE e #-}

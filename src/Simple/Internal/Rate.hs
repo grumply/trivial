@@ -11,6 +11,7 @@ import Simple.Internal.Magnitude
 import Simple.Internal.Base
 import Simple.Internal.Space
 import Simple.Internal.Time
+import Simple.Internal.Variance
 
 import Data.Int
 
@@ -27,6 +28,7 @@ class IsRate r where
 newtype PerSecond = PerSecond { getPerSecond :: Double }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
 
+instance Vary PerSecond
 
 instance  Pretty PerSecond where
     pretty (PerSecond r) = printf "%.2f/s" r
@@ -50,6 +52,8 @@ pattern Rate d t <- (viewPerSecond . fromRate -> (d,t)) where
 
 newtype CollectionRate = CollectionRate { getCollectionRate :: PerSecond }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
+
+instance Vary CollectionRate
 
 instance IsRate CollectionRate where
   toRate = CollectionRate

@@ -6,30 +6,17 @@ import Data.Int
 import Data.Word
 
 class Similar a where
-  similar :: Real b => b -> a -> a -> Bool
-
-  {-# INLINE dissimilar #-}
-  dissimilar :: Real b => b -> a -> a -> Bool
-  dissimilar b x y = not (similar b x y)
-
-  default similar :: (Real b, Real a) => b -> a -> a -> Bool
-  -- | Check if two reals are of similar magnitude given a scaling base `b`.
-  --
-  -- In general, as x grows, relative epsilon shrinks as a factor of log_b x.
-  --
-  -- During development, `e` is a good base for approximation of results.
-  --
-  -- Note: For b < 1, similar b _ _ -> False
-  --
-  {-# INLINE similar #-}
-  -- similar :: (Real a,Real b) => a -> b -> b -> Bool
-  similar _ 0 0 = True
-  similar (realToFrac -> b) (realToFrac -> x) (realToFrac -> y) =
+  sim :: (Real b) => b -> a -> a -> Bool
+  default sim :: (Eq a, Real a, Real b) => b -> a -> a -> Bool
+  sim _ 0 0 = True
+  sim (realToFrac -> b) (realToFrac -> x) (realToFrac -> y) =
       -- As b ↘ 1, epsilon ↘ 0
-      let epsilon = (x :: Double) / (logBase b (x + 1))
+      let epsilon = (x :: Double) / (logBase b (x + 1) + 1)
           (lo,hi) = (x - epsilon,x + epsilon)
       in lo <= y && y <= hi
 
+similar :: (Similar a) => a -> a -> Bool
+similar = sim (exp 1)
 
 instance Similar Double
 instance Similar Float

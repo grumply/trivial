@@ -5,16 +5,19 @@ module Simple.Internal.Magnitude where
 import Data.Int
 import Data.Word
 
-import Simple.Internal.Base
-
-class Ord a => Magnitude a where
+class Magnitude a where
   mag :: (Real b) => b -> a -> a -> Bool
-  default mag :: (Base a, Real a) => b -> a -> a -> Bool
-  mag _ (realToFrac -> x) (realToFrac -> y)=
-    let o = realToFrac (floor (logBase (base y) (x :: Double)))
+
+  default mag :: (Real b, Real a) => b -> a -> a -> Bool
+  mag (realToFrac -> b) (realToFrac -> x) a@(realToFrac -> y)=
+    let o = realToFrac $ floor (logBase b (x :: Double)) + 1
         hi :: Double
-        hi = (realToFrac $ base y) ** (o + 1)
-    in y < hi
+        hi = b ** o
+        e = x / (logBase b o + 1)
+    in y <= hi + e
+
+magnitude :: Magnitude a => a -> a -> Bool
+magnitude = mag (exp 1)
 
 instance Magnitude Double
 instance Magnitude Float

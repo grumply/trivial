@@ -9,6 +9,7 @@ import Simple.Internal.Pretty
 import Simple.Internal.Similar
 import Simple.Internal.Magnitude
 import Simple.Internal.Base
+import Simple.Internal.Variance
 
 import Data.Int
 
@@ -23,13 +24,15 @@ class IsSpace a where
   fromSpace :: a -> Space
 
 newtype Space = Space { getBytes :: Int64 }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,ToJSON,FromJSON)
+
+instance Vary Space
 
 instance Base Space where
   base _ = 2
 
 instance Similar Space where
-  similar b (Megabytes b1) (Megabytes b2) = similar b b1 b2
+  sim b (Megabytes b1) (Megabytes b2) = sim b b1 b2
 
 instance Magnitude Space where
   mag b (Megabytes b1) (Megabytes b2) = mag b b1 b2
@@ -72,12 +75,14 @@ instance Pretty Space where
 newtype Mutated = Mutated { getMutated :: Space }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
+instance Vary Mutated
+
 instance IsSpace Mutated where
   toSpace = Mutated
   fromSpace = getMutated
 
 instance Similar Mutated where
-  similar b (Megabytes mb1) (Megabytes mb2) = similar b mb1 mb2
+  sim b (Megabytes mb1) (Megabytes mb2) = sim b mb1 mb2
 
 instance Improving Mutated where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
@@ -89,12 +94,14 @@ instance Improving Mutated where
 newtype Allocated = Allocated { getAllocated :: Space }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
+instance Vary Allocated
+
 instance IsSpace Allocated where
   toSpace = Allocated
   fromSpace = getAllocated
 
 instance Similar Allocated where
-  similar b (Megabytes mb1) (Megabytes mb2) = similar b mb1 mb2
+  sim b (Megabytes mb1) (Megabytes mb2) = sim b mb1 mb2
 
 instance Improving Allocated where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
@@ -105,12 +112,14 @@ instance Improving Allocated where
 newtype Slop = Slop { getSlop :: Space }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
+instance Vary Slop
+
 instance IsSpace Slop where
   toSpace = Slop
   fromSpace = getSlop
 
 instance Similar Slop where
-  similar b (Bytes b1) (Bytes b2) = similar b b1 b2
+  sim b (Bytes b1) (Bytes b2) = sim b b1 b2
 
 instance Improving Slop where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
@@ -122,12 +131,14 @@ instance Improving Slop where
 newtype Max = Max { getMax :: Space }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
+instance Vary Max
+
 instance IsSpace Max where
   toSpace = Max
   fromSpace = getMax
 
 instance Similar Max where
-  similar b (Bytes b1) (Bytes b2) = similar b b1 b2
+  sim b (Bytes b1) (Bytes b2) = sim b b1 b2
 
 instance Improving Max where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
@@ -139,12 +150,14 @@ instance Improving Max where
 newtype Cumulative = Cumulative { getCumulative :: Space }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
+instance Vary Cumulative
+
 instance IsSpace Cumulative where
   toSpace = Cumulative
   fromSpace = getCumulative
 
 instance Similar Cumulative where
-  similar b (Bytes b1) (Bytes b2) = similar b b1 b2
+  sim b (Bytes b1) (Bytes b2) = sim b b1 b2
 
 instance Improving Cumulative where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
@@ -156,12 +169,14 @@ instance Improving Cumulative where
 newtype Copied = Copied { getCopied :: Space }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
+instance Vary Copied
+
 instance IsSpace Copied where
   toSpace = Copied
   fromSpace = getCopied
 
 instance Similar Copied where
-  similar b (Bytes b1) (Bytes b2) = similar b b1 b2
+  sim b (Bytes b1) (Bytes b2) = sim b b1 b2
 
 instance Improving Copied where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
@@ -173,12 +188,14 @@ instance Improving Copied where
 newtype Used = Used { getUsed :: Space }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Magnitude,Base)
 
+instance Vary Used
+
 instance IsSpace Used where
   toSpace = Used
   fromSpace = getUsed
 
 instance Similar Used where
-  similar b (Bytes b1) (Bytes b2) = similar b b1 b2
+  sim b (Bytes b1) (Bytes b2) = sim b b1 b2
 
 instance Improving Used where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
@@ -190,12 +207,14 @@ instance Improving Used where
 newtype MaxSlop = MaxSlop { getMaxSlop :: Space }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
+instance Vary MaxSlop
+
 instance IsSpace MaxSlop where
   toSpace = MaxSlop
   fromSpace = getMaxSlop
 
 instance Similar MaxSlop where
-  similar b (Bytes b1) (Bytes b2) = similar b b1 b2
+  sim b (Bytes b1) (Bytes b2) = sim b b1 b2
 
 instance Improving MaxSlop where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
@@ -207,12 +226,14 @@ instance Improving MaxSlop where
 newtype Peak = Peak { getPeak :: Space }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
+instance Vary Peak
+
 instance IsSpace Peak where
   toSpace = Peak
   fromSpace = getPeak
 
 instance Similar Peak where
-  similar b (Bytes b1) (Bytes b2) = similar b b1 b2
+  sim b (Bytes b1) (Bytes b2) = sim b b1 b2
 
 instance Improving Peak where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
@@ -224,12 +245,14 @@ instance Improving Peak where
 newtype Live = Live { getLive :: Space }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
+instance Vary Live
+
 instance IsSpace Live where
   toSpace = Live
   fromSpace = getLive
 
 instance Similar Live where
-  similar b (Bytes b1) (Bytes b2) = similar b b1 b2
+  sim b (Bytes b1) (Bytes b2) = sim b b1 b2
 
 instance Improving Live where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better

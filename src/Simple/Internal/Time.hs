@@ -12,6 +12,8 @@ import Simple.Internal.Similar
 import Simple.Internal.Base
 import Simple.Internal.Magnitude
 
+import Simple.Internal.Variance
+
 import Text.Printf
 
 import Data.Int
@@ -20,7 +22,7 @@ import Data.Aeson
 
 newtype Time = Time { getSeconds :: Double }
   deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON)
-
+instance Vary Time
 instance Base Time
 instance Magnitude Time
 
@@ -76,6 +78,8 @@ pattern Nanoseconds s <- ((* 1000000000) . getSeconds . fromTime -> s) where
 newtype Elapsed = Elapsed Time
   deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON,Pretty,Magnitude)
 
+instance Vary Elapsed
+
 instance IsTime Elapsed where
   toTime = Elapsed
   fromTime (Elapsed e) = e
@@ -90,7 +94,7 @@ instance Base Elapsed where
     | otherwise = 10
 
 instance Similar Elapsed where
-  similar b (Milliseconds d) (Milliseconds d') = similar b d d'
+  sim b (Milliseconds d) (Milliseconds d') = sim b d d'
 
 class HasElapsed a where
   elapsed :: a -> Elapsed
@@ -100,6 +104,8 @@ class HasElapsed a where
 
 newtype CPUTime = CPUTime Time
   deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON,Pretty,Magnitude)
+
+instance Vary CPUTime
 
 instance IsTime CPUTime where
   toTime = CPUTime
@@ -112,7 +118,7 @@ instance Improving CPUTime where
 instance Base CPUTime
 
 instance Similar CPUTime where
-  similar b (Microseconds us) (Microseconds us') = similar b us us'
+  sim b (Microseconds us) (Microseconds us') = sim b us us'
 
 class HasCPUTime a where
   cpuTime :: a -> CPUTime

@@ -167,15 +167,15 @@ constrain br1 br2 =
             f :>> () ->
               (" :>>",f,\(M s) -> improving (s br1) (s br2) && not (mag (base (s br1)) (s br1) (s br2)))
             f :> () ->
-              (" :>",f,\(M s) -> improving (s br1) (s  br2) && not (similar (base (s br1)) (s br1) (s br2)))
+              (" :>",f,\(M s) -> improving (s br1) (s  br2) && not (sim (base (s br1)) (s br1) (s br2)))
             f :>= () ->
-              (" :>=",f,\(M s) -> improving (s br1) (s br2) || similar (base (s br1)) (s br1) (s br2))
+              (" :>=",f,\(M s) -> improving (s br1) (s br2) || sim (base (s br1)) (s br1) (s br2))
             f := () ->
-              (" >=",f,\(M s) -> similar (base (s br1)) (s br1) (s br2))
+              (" >=",f,\(M s) -> sim (base (s br1)) (s br1) (s br2))
             f :<= () ->
-              (" :<=",f,\(M s) -> improving (s br2) (s br1) || similar (base (s br1)) (s br1) (s br2))
+              (" :<=",f,\(M s) -> improving (s br2) (s br1) || sim (base (s br1)) (s br1) (s br2))
             f :< () ->
-              (" :<",f,\(M s) -> improving (s br2) (s br1) && not (similar (base (s br1)) (s br1) (s br2)))
+              (" :<",f,\(M s) -> improving (s br2) (s br1) && not (sim (base (s br1)) (s br1) (s br2)))
             f :<< () ->
               (" :<<",f,\(M s) -> improving (s br2) (s br1) && not (mag (base (s br1)) (s br1) (s br2)))
         selector f =

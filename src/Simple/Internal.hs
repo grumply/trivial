@@ -15,6 +15,7 @@ import Simple.Internal.Similar
 import Simple.Internal.Space
 import Simple.Internal.Time
 import Simple.Internal.Percent
+import Simple.Internal.Variance
 
 import GHC.Generics
 import GHC.Stats
@@ -63,6 +64,8 @@ data BenchResult = BenchResult
     , copied       :: {-# UNPACK #-}!Copied
     , slop         :: {-# UNPACK #-}!Slop
     } deriving (Generic, Read, Show, Eq, ToJSON, FromJSON)
+
+instance Vary BenchResult
 
 instance Pretty BenchResult where
     pretty BenchResult {..} =

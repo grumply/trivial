@@ -12,6 +12,7 @@ import Simple.Internal.Magnitude
 import Simple.Internal.Base
 import Simple.Internal.Space
 import Simple.Internal.Time
+import Simple.Internal.Variance
 
 import Data.Int
 
@@ -31,6 +32,8 @@ instance IsDataRate Double where
 
 newtype SomeDataRate = SomeDataRate { getDataRate :: Double }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
+
+instance Vary SomeDataRate
 
 instance Pretty SomeDataRate where
     pretty (SomeDataRate t)
@@ -61,6 +64,8 @@ pattern DataRate s t <- (viewDataRate -> (s,t)) where
 newtype CopyRate = CopyRate { getCopyRate :: SomeDataRate }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON,Pretty)
 
+instance Vary CopyRate
+
 instance IsDataRate CopyRate where
   toDataRate = CopyRate
   fromDataRate = getCopyRate
@@ -71,9 +76,9 @@ instance Base CopyRate where
   base _ = 2
 
 instance Similar CopyRate where
-  similar b (DataRate (Megabytes mbps :: Space) (_ :: Time))
+  sim b (DataRate (Megabytes mbps :: Space) (_ :: Time))
             (DataRate (Megabytes mbps':: Space) (_ :: Time))
-    = similar b mbps mbps'
+    = sim b mbps mbps'
 
 ----------------------------------------
 -- Allocation Rate
@@ -81,8 +86,10 @@ instance Similar CopyRate where
 newtype AllocationRate = AllocationRate { getAllocationRate :: SomeDataRate }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON,Pretty)
 
+instance Vary AllocationRate
+
 instance Magnitude AllocationRate
-  
+
 instance IsDataRate AllocationRate where
   toDataRate = AllocationRate
   fromDataRate = getAllocationRate
@@ -93,8 +100,8 @@ instance Base AllocationRate where
   base _ = 2
 
 instance Similar AllocationRate where
-  similar b
+  sim b
     (DataRate (Megabytes mbps :: Space) (_ :: Time))
     (DataRate (Megabytes mbps' :: Space) (_ :: Time))
-      = similar b mbps mbps'
+      = sim b mbps mbps'
 

@@ -11,6 +11,7 @@ import Simple.Internal.Magnitude
 import Simple.Internal.Base
 import Simple.Internal.Space
 import Simple.Internal.Time
+import Simple.Internal.Variance
 
 import Data.Int
 
@@ -22,6 +23,8 @@ import Data.Aeson
 
 newtype SomeCount = SomeCount { getCount :: Int64 }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,Integral,Enum,Base,Similar,ToJSON,FromJSON,Magnitude)
+
+instance Vary SomeCount
 
 pattern Count :: IsCount c => Int64 -> c
 pattern Count c <- (getCount . fromCount -> c) where
@@ -54,6 +57,8 @@ instance IsCount ByteUsageSamples where
 
 newtype Collections = Collections { getCollections :: SomeCount }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON,Base,Magnitude,Similar)
+
+instance Vary Collections
 
 instance IsCount Collections where
   toCount = Collections

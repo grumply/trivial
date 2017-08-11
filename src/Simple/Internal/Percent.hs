@@ -2,7 +2,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Simple.Internal.Percent where
 
-import Simple.Internal.Pretty as Export
+import Simple.Internal.Pretty
+import Simple.Internal.Variance
 
 import GHC.Generics
 
@@ -12,6 +13,8 @@ import Text.Printf
 
 newtype Percent = Percent { getPercent :: Double }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
+
+instance Vary Percent
 
 instance Pretty Percent where
     pretty (Percent r)
