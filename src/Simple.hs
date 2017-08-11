@@ -13,7 +13,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# Language ExistentialQuantification #-}
-module Simple where
+module Simple (module Simple, module Export) where
 
 -- Note: to use this module, you must run your program with the -T rtsopt
 -- ghc --make -O2 -rtsopts A.hs && ./A +RTS -T
@@ -41,7 +41,7 @@ import Control.Concurrent
 import Easy
 import Text.Printf
 
-import Simple.Types
+import Simple.Types as Export
 
 _GCStats_size = 152
 
@@ -147,14 +147,16 @@ data Feature = Garbage | GCs | Clock | Allocs | Mutation
   deriving (Eq,Show,Ord,Read,Enum)
 
 data Predicate
-  = forall b. (Real b) => Feature :>  b
-  | forall b. (Real b) => Feature :>= b
-  | forall b. (Real b) => Feature :=  b
-  | forall b. (Real b) => Feature :<= b
-  | forall b. (Real b) => Feature :<  b
+  = Feature :>> ()
+  | Feature :>  ()
+  | Feature :>= ()
+  | Feature :=  ()
+  | Feature :<= ()
+  | Feature :<  ()
+  | Feature :<< ()
 
-data SomeImprovingComparable
-  = forall a. (Improving a, Similar a, Pretty a) => SIC (BenchResult -> a)
+data Measurable
+  = forall a. (Magnitude a, Base a, Improving a, Similar a, Pretty a) => M (BenchResult -> a)
 
 {-# INLINE constrain #-}
 constrain :: BenchResult -> BenchResult -> [Predicate] -> Test sync ()
@@ -162,23 +164,27 @@ constrain br1 br2 =
   mapM_ $ \p ->
     let pred =
           case p of
-            f :> b ->
-              (" :>",f,\(SIC s) -> improving (s br1) (s  br2) && not (similar b (s br1) (s br2)))
-            f :>= b ->
-              (" :>=",f,\(SIC s) -> improving (s br1) (s br2) || similar b (s br1) (s br2))
-            f := b ->
-              (" >=",f,\(SIC s) -> similar b (s br1) (s br2))
-            f :<= b ->
-              (" :<=",f,\(SIC s) -> improving (s br2) (s br1) || similar b (s br1) (s br2))
-            f :< b ->
-              (" :<",f,\(SIC s) -> improving (s br2) (s br1) && not (similar b (s br1) (s br2)))
+            f :>> () ->
+              (" :>>",f,\(M s) -> improving (s br1) (s br2) && not (mag (base (s br1)) (s br1) (s br2)))
+            f :> () ->
+              (" :>",f,\(M s) -> improving (s br1) (s  br2) && not (similar (base (s br1)) (s br1) (s br2)))
+            f :>= () ->
+              (" :>=",f,\(M s) -> improving (s br1) (s br2) || similar (base (s br1)) (s br1) (s br2))
+            f := () ->
+              (" >=",f,\(M s) -> similar (base (s br1)) (s br1) (s br2))
+            f :<= () ->
+              (" :<=",f,\(M s) -> improving (s br2) (s br1) || similar (base (s br1)) (s br1) (s br2))
+            f :< () ->
+              (" :<",f,\(M s) -> improving (s br2) (s br1) && not (similar (base (s br1)) (s br1) (s br2)))
+            f :<< () ->
+              (" :<<",f,\(M s) -> improving (s br2) (s br1) && not (mag (base (s br1)) (s br1) (s br2)))
         selector f =
           case f of
-            Garbage  -> SIC $ copied
-            GCs      -> SIC $ collections
-            Clock    -> SIC $ cputime
-            Allocs   -> SIC $ alloc
-            Mutation -> SIC $ \a -> DataRate (alloc a) (cputime a) :: AllocationRate
+            Garbage  -> M $ copied
+            GCs      -> M $ collections
+            Clock    -> M $ cputime
+            Allocs   -> M $ alloc
+            Mutation -> M $ \a -> DataRate (alloc a) (cputime a) :: AllocationRate
     in case pred of
         (sc,f,g) -> scope (show f ++ sc) $
           let sel = selector f in
@@ -186,5 +192,5 @@ constrain br1 br2 =
             ok
           else
             case sel of
-              SIC s -> crash $
+              M s -> crash $
                 intercalate " " [ "Expecting:", pretty (s br1), improvingShow (s br1), pretty (s br2) ]

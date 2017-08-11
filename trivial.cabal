@@ -15,18 +15,44 @@ cabal-version:       >=1.10
 
 executable main
   main-is: Main.hs
-  other-modules: Easy
-                 Simple
-                 Trivial
+  other-modules:  Easy
+                  Simple
+                  Trivial
+                  Simple.Internal.Base
+                  Simple.Internal.Count
+                  Simple.Internal.DataRate
+                  Simple.Internal.Improving
+                  Simple.Internal.Magnitude
+                  Simple.Internal.Percent
+                  Simple.Internal.Pretty
+                  Simple.Internal.Rate
+                  Simple.Internal.Similar
+                  Simple.Internal.Space
+                  Simple.Internal.Time
+                  Simple.Types
+                  Simple.Internal
   hs-source-dirs: src tests
   ghc-options: -O2 -with-rtsopts=-T
   build-depends: async, base >=4.5, containers, deepseq, directory, hashable, managed, mtl, random, stm, aeson
   default-language: Haskell2010
 
 library
-  exposed-modules:     Easy
-                       Simple
-                       Trivial
+  exposed-modules:    Easy
+                      Simple
+                      Trivial
+                      Simple.Internal.Base
+                      Simple.Internal.Count
+                      Simple.Internal.DataRate
+                      Simple.Internal.Improving
+                      Simple.Internal.Magnitude
+                      Simple.Internal.Percent
+                      Simple.Internal.Pretty
+                      Simple.Internal.Rate
+                      Simple.Internal.Similar
+                      Simple.Internal.Space
+                      Simple.Internal.Time
+                      Simple.Types
+                      Simple.Internal
   -- other-modules:       
   -- other-extensions:    
   build-depends:       async, base >=4.5, containers, deepseq, directory, hashable, managed, mtl, random, stm, aeson

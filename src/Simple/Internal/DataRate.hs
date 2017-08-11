@@ -81,6 +81,8 @@ instance Similar CopyRate where
 newtype AllocationRate = AllocationRate { getAllocationRate :: SomeDataRate }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON,Pretty)
 
+instance Magnitude AllocationRate
+  
 instance IsDataRate AllocationRate where
   toDataRate = AllocationRate
   fromDataRate = getAllocationRate

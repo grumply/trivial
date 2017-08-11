@@ -21,7 +21,7 @@ import Text.Printf
 import Data.Aeson
 
 newtype SomeCount = SomeCount { getCount :: Int64 }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Integral,Enum,Base,Similar,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Integral,Enum,Base,Similar,ToJSON,FromJSON,Magnitude)
 
 pattern Count :: IsCount c => Int64 -> c
 pattern Count c <- (getCount . fromCount -> c) where
@@ -53,7 +53,7 @@ instance IsCount ByteUsageSamples where
 -- Collection Count
 
 newtype Collections = Collections { getCollections :: SomeCount }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON,Base,Magnitude,Similar)
 
 instance IsCount Collections where
   toCount = Collections
@@ -65,7 +65,3 @@ instance Pretty Collections where
 instance Improving Collections where
   improving c1 c2 = c1 > c2
   improvingShow _ = ">"
-
-instance Similar Collections
-
-instance Base Collections

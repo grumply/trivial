@@ -25,6 +25,15 @@ class IsSpace a where
 newtype Space = Space { getBytes :: Int64 }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
 
+instance Base Space where
+  base _ = 2
+
+instance Similar Space where
+  similar b (Megabytes b1) (Megabytes b2) = similar b b1 b2
+
+instance Magnitude Space where
+  mag b (Megabytes b1) (Megabytes b2) = mag b b1 b2
+
 instance IsSpace Space where
   toSpace = id
   fromSpace = id
@@ -61,7 +70,7 @@ instance Pretty Space where
 -- Mutated Bytes
 
 newtype Mutated = Mutated { getMutated :: Space }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance IsSpace Mutated where
   toSpace = Mutated
@@ -74,14 +83,11 @@ instance Improving Mutated where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
   improvingShow _ = ">"
 
-instance Base Mutated where
-  base _ = 2
-
 ----------------------------------------
 -- Allocated Bytes
 
 newtype Allocated = Allocated { getAllocated :: Space }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance IsSpace Allocated where
   toSpace = Allocated
@@ -92,17 +98,12 @@ instance Similar Allocated where
 
 instance Improving Allocated where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
-  improvingShow _ = ">"
-
-instance Base Allocated where
-  base _ = 2
-
 
 ----------------------------------------
 -- GC Slop
 
 newtype Slop = Slop { getSlop :: Space }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance IsSpace Slop where
   toSpace = Slop
@@ -115,14 +116,11 @@ instance Improving Slop where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
   improvingShow _ = ">"
 
-instance Base Slop where
-  base _ = 2
-
 ----------------------------------------
 -- Max Bytes
 
 newtype Max = Max { getMax :: Space }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance IsSpace Max where
   toSpace = Max
@@ -135,14 +133,11 @@ instance Improving Max where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
   improvingShow _ = ">"
 
-instance Base Max where
-  base _ = 2
-
 ----------------------------------------
 -- Cumulative Bytes
 
 newtype Cumulative = Cumulative { getCumulative :: Space }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance IsSpace Cumulative where
   toSpace = Cumulative
@@ -155,14 +150,11 @@ instance Improving Cumulative where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
   improvingShow _ = ">"
 
-instance Base Cumulative where
-  base _ = 2
-
 ----------------------------------------
 -- Copied Bytes
 
 newtype Copied = Copied { getCopied :: Space }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance IsSpace Copied where
   toSpace = Copied
@@ -175,14 +167,11 @@ instance Improving Copied where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
   improvingShow _ = ">"
 
-instance Base Copied where
-  base _ = 2
-
 ----------------------------------------
 -- Bytes Used
 
 newtype Used = Used { getUsed :: Space }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Magnitude,Base)
 
 instance IsSpace Used where
   toSpace = Used
@@ -195,14 +184,11 @@ instance Improving Used where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
   improvingShow _ = ">"
 
-instance Base Used where
-  base _ = 2
-
 ----------------------------------------
 -- Max Slop
 
 newtype MaxSlop = MaxSlop { getMaxSlop :: Space }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance IsSpace MaxSlop where
   toSpace = MaxSlop
@@ -215,14 +201,11 @@ instance Improving MaxSlop where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
   improvingShow _ = ">"
 
-instance Base MaxSlop where
-  base _ = 2
-
 ----------------------------------------
 -- Peak Allocated
 
 newtype Peak = Peak { getPeak :: Space }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance IsSpace Peak where
   toSpace = Peak
@@ -235,14 +218,11 @@ instance Improving Peak where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
   improvingShow _ = ">"
 
-instance Base Peak where
-  base _ = 2
-
 ----------------------------------------
 -- Live Bytes
 
 newtype Live = Live { getLive :: Space }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance IsSpace Live where
   toSpace = Live
@@ -254,7 +234,4 @@ instance Similar Live where
 instance Improving Live where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
   improvingShow _ = ">"
-
-instance Base Live where
-  base _ = 2
 

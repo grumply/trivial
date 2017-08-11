@@ -21,6 +21,9 @@ import Data.Aeson
 newtype Time = Time { getSeconds :: Double }
   deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON)
 
+instance Base Time
+instance Magnitude Time
+
 instance Pretty Time where
     pretty (Time d)
         | d < 0.001    = printf     "%.0fμs" (d * 1000000)
@@ -71,7 +74,7 @@ pattern Nanoseconds s <- ((* 1000000000) . getSeconds . fromTime -> s) where
 -- Elapsed time; wall clock
 
 newtype Elapsed = Elapsed Time
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON,Pretty)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON,Pretty,Magnitude)
 
 instance IsTime Elapsed where
   toTime = Elapsed
@@ -96,7 +99,7 @@ class HasElapsed a where
 -- CPUTime; cpu clock
 
 newtype CPUTime = CPUTime Time
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON,Pretty)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,Read,Show,ToJSON,FromJSON,Pretty,Magnitude)
 
 instance IsTime CPUTime where
   toTime = CPUTime

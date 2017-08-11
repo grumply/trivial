@@ -27,7 +27,8 @@ class IsRate r where
 newtype PerSecond = PerSecond { getPerSecond :: Double }
   deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
 
-instance Pretty PerSecond where
+
+instance  Pretty PerSecond where
     pretty (PerSecond r) = printf "%.2f/s" r
 
 instance IsRate PerSecond where
