@@ -28,11 +28,13 @@ instance Magnitude Time
 
 instance Pretty Time where
     pretty (Time d)
-        | d < 0.001    = printf     "%.0fμs" (d * 1000000)
-        | d < 1        = printf     "%.2fms" (d * 1000)
-        | d < 60       = printf     "%.2fs"   d
-        | d < 60^2     = printf "%.0fm %ds"  (d / 60)   (roundi d `mod` 60)
-        | otherwise    = printf "%.0fh %dm"  (d / 60^2) (roundi d `mod` 60^2)
+        | d < 0.000000001 = printf     "%.0fps" (d * 1000000000000)
+        | d < 0.000001    = printf     "%.1fns" (d * 1000000000)
+        | d < 0.001       = printf     "%.1fμs" (d * 1000000)
+        | d < 1           = printf     "%.2fms" (d * 1000)
+        | d < 60          = printf     "%.2fs"   d
+        | d < 60^2        = printf "%.0fm %ds"  (d / 60)   (roundi d `mod` 60)
+        | otherwise       = printf "%.0fh %dm"  (d / 60^2) (roundi d `mod` 60^2)
       where
         roundi :: Double -> Int
         roundi = round
@@ -71,6 +73,11 @@ pattern Microseconds s <- ((* 1000000) . getSeconds . fromTime -> s) where
 pattern Nanoseconds :: IsTime t => Double -> t
 pattern Nanoseconds s <- ((* 1000000000) . getSeconds . fromTime -> s) where
   Nanoseconds (toTime . Time . (/1000000000) -> s) = s
+
+pattern Picoseconds :: IsTime t => Double -> t
+pattern Picoseconds s <- ((* 1000000000000) . getSeconds . fromTime -> s) where
+  Picoseconds (toTime . Time . (/1000000000000) -> s) = s
+
 
 ----------------------------------------
 -- Elapsed time; wall clock

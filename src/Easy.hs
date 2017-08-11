@@ -4,7 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TypeApplications           #-}
-
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-
 
 Modification of EasyTest from:
@@ -157,7 +157,7 @@ tests = msum
 
 {-# INLINE runOnly #-}
 -- | Run all tests whose scope starts with the given prefix
-runOnly :: String -> Test sync a -> IO ()
+runOnly :: String -> Test sync a -> IO (Maybe a)
 runOnly prefix t = do
   logger <- atomicLogger
   seed <- abs <$> Random.randomIO :: IO Int
@@ -165,21 +165,21 @@ runOnly prefix t = do
 
 {-# INLINE rerunOnly #-}
 -- | Run all tests with the given seed and whose scope starts with the given prefix
-rerunOnly :: Int -> String -> Test sync a -> IO ()
+rerunOnly :: Int -> String -> Test sync a -> IO (Maybe a)
 rerunOnly seed prefix t = do
   logger <- atomicLogger
   run' seed logger prefix t
 
 {-# INLINE run #-}
-run :: Test sync a -> IO ()
+run :: Test sync a -> IO (Maybe a)
 run = runOnly ""
 
 {-# INLINE rerun #-}
-rerun :: Int -> Test sync a -> IO ()
+rerun :: Int -> Test sync a -> IO (Maybe a)
 rerun seed = rerunOnly seed []
 
 {-# INLINE run' #-}
-run' :: Int -> (String -> IO ()) -> String -> Test sync a -> IO ()
+run' :: Int -> (String -> IO ()) -> String -> Test sync a -> IO (Maybe a)
 run' seed note allow (Test t) = do
   let !rng = Random.mkStdGen seed
   resultsQ <- atomically (newTBQueue 50)
@@ -200,44 +200,50 @@ run' seed note allow (Test t) = do
   let line = "------------------------------------------------------------"
   note "Raw test output to follow ... "
   note line
-  e <- try (runReaderT (void t) (Env rngVar [] resultsQ note allow)) :: IO (Either SomeException ())
+  e <- try (runReaderT t (Env rngVar [] resultsQ note allow))
+  let finish = do
+        atomically $ writeTBQueue resultsQ Nothing
+        _ <- A.waitCatch rs
+        resultsMap <- readTVarIO results
+        let
+          resultsList = Map.toList resultsMap
+          succeededList = [ n | (_, Passed n) <- resultsList ]
+          succeeded = length succeededList
+          -- totalTestCases = foldl' (+) 0 succeededList
+          failures = [ a | (a, Failed) <- resultsList ]
+          failed = length failures
+        case failures of
+          [] -> do
+            note line
+            case succeeded of
+              0 -> do
+                note "😶  hmm ... no test results recorded"
+                note "Tip: use `ok`, `expect`, or `crash` to record results"
+                note "Tip: if running via `runOnly` or `rerunOnly`, check for typos"
+              1 -> note $ "✅  1 test passed, no failures! 👍 🎉"
+              _ -> note $ "✅  " ++ show succeeded ++ " tests passed, no failures! 👍 🎉"
+          (hd:_) -> do
+            note line
+            note "\n"
+            note $ "  " ++ show succeeded ++ (if failed == 0 then " PASSED" else " passed")
+            note $ "  " ++ show (length failures) ++ (if failed == 0 then " failed" else " FAILED (failed scopes below)")
+            note $ "    " ++ intercalate "\n    " (map show failures)
+            note ""
+            note $ "  To rerun with same random seed:\n"
+            note $ "    EasyTest.rerun " ++ show seed
+            note $ "    EasyTest.rerunOnly " ++ show seed ++ " " ++ "\"" ++ hd ++ "\""
+            note "\n"
+            note line
+            note "❌"
+            exitWith (ExitFailure 1)
   case e of
-    Left e -> note $ "Exception while running tests: " ++ show e
-    Right () -> pure ()
-  atomically $ writeTBQueue resultsQ Nothing
-  _ <- A.waitCatch rs
-  resultsMap <- readTVarIO results
-  let
-    resultsList = Map.toList resultsMap
-    succeededList = [ n | (_, Passed n) <- resultsList ]
-    succeeded = length succeededList
-    -- totalTestCases = foldl' (+) 0 succeededList
-    failures = [ a | (a, Failed) <- resultsList ]
-    failed = length failures
-  case failures of
-    [] -> do
-      note line
-      case succeeded of
-        0 -> do
-          note "😶  hmm ... no test results recorded"
-          note "Tip: use `ok`, `expect`, or `crash` to record results"
-          note "Tip: if running via `runOnly` or `rerunOnly`, check for typos"
-        1 -> note $ "✅  1 test passed, no failures! 👍 🎉"
-        _ -> note $ "✅  " ++ show succeeded ++ " tests passed, no failures! 👍 🎉"
-    (hd:_) -> do
-      note line
-      note "\n"
-      note $ "  " ++ show succeeded ++ (if failed == 0 then " PASSED" else " passed")
-      note $ "  " ++ show (length failures) ++ (if failed == 0 then " failed" else " FAILED (failed scopes below)")
-      note $ "    " ++ intercalate "\n    " (map show failures)
-      note ""
-      note $ "  To rerun with same random seed:\n"
-      note $ "    EasyTest.rerun " ++ show seed
-      note $ "    EasyTest.rerunOnly " ++ show seed ++ " " ++ "\"" ++ hd ++ "\""
-      note "\n"
-      note line
-      note "❌"
-      exitWith (ExitFailure 1)
+    Left (e :: SomeException) -> do
+      note $ "Exception while running tests: " ++ show e
+      finish
+      return Nothing
+    Right a -> do
+      finish
+      return a
 
 {-# INLINE scope #-}
 -- | Label a test. Can be nested. A `'.'` is placed between nested

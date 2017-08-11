@@ -23,14 +23,14 @@ import GHC.Stats
 import Data.Aeson
 import Data.Monoid
 
-{-# INLINE mkBenchResult #-}
-mkBenchResult :: String -> GCStats -> GCStats -> BenchResult
-mkBenchResult label before after =
+{-# INLINE mkRuntimeStats #-}
+mkRuntimeStats :: String -> GCStats -> GCStats -> RuntimeStats
+mkRuntimeStats label before after =
     let cpuElapsed  = Seconds (wallSeconds after)        - Seconds (wallSeconds before)
         cputime     = Seconds (cpuSeconds after)         - Seconds (cpuSeconds before)
         mutElapsed  = Seconds (mutatorWallSeconds after) - Seconds (mutatorWallSeconds before)
         mutTime     = Seconds (mutatorCpuSeconds after)  - Seconds (mutatorCpuSeconds before)
-        alloc       = Bytes (bytesAllocated after)       - Bytes (bytesAllocated before)
+        allocated   = Bytes (bytesAllocated after)       - Bytes (bytesAllocated before)
         peak        = Megabytes (peakMegabytesAllocated after) - Megabytes (peakMegabytesAllocated before)
         used        = Bytes (currentBytesUsed after)     - Bytes (currentBytesUsed before)
         cumulative  = Bytes (cumulativeBytesUsed after)  - Bytes (cumulativeBytesUsed before)
@@ -42,15 +42,15 @@ mkBenchResult label before after =
         uncollected = Bytes (currentBytesUsed after)     - Bytes (currentBytesUsed before)
         copied      = Bytes (bytesCopied after)          - Bytes (bytesCopied before)
         slop        = Bytes (currentBytesSlop after)     - Bytes (currentBytesSlop before)
-    in BenchResult {..}
+    in RuntimeStats {..}
 
-data BenchResult = BenchResult
+data RuntimeStats = RuntimeStats
     { label        :: !String
     , cpuElapsed   :: {-# UNPACK #-}!Elapsed
     , cputime      :: {-# UNPACK #-}!CPUTime
     , mutElapsed   :: {-# UNPACK #-}!Elapsed
     , mutTime      :: {-# UNPACK #-}!CPUTime
-    , alloc        :: {-# UNPACK #-}!Allocated
+    , allocated    :: {-# UNPACK #-}!Allocated
     -- , mutated      :: {-# UNPACK #-}!Mutated
     , peak         :: {-# UNPACK #-}!Peak
     , used         :: {-# UNPACK #-}!Used
@@ -65,27 +65,24 @@ data BenchResult = BenchResult
     , slop         :: {-# UNPACK #-}!Slop
     } deriving (Generic, Read, Show, Eq, ToJSON, FromJSON)
 
-instance Vary BenchResult
+instance Vary RuntimeStats
 
-instance Pretty BenchResult where
-    pretty BenchResult {..} =
+instance Pretty RuntimeStats where
+    pretty RuntimeStats {..} =
         unlines
             [ ""
-            , header
+            , divider
+            , header2
             , divider
             , cpuTimeStats
             , mutTimeStats
             , gcTimeStats
             , ""
-            , "Collections:" <> pad 7 (pretty collections)
-            , "Leftover:   " <> pad 7 (pretty uncollected)
+            , "Collections:" <> pad 11 (pretty collections)
+            , "Leftover:   " <> pad 11 (pretty uncollected)
             ]
       where
-        header = "            Time |"
-                  <> "    Relative |"
-                  <> "       Bytes |"
-                  <> "    Throughput"
-
+        header2 = "                Time           |       Space |    Throughput"
         divider = "     -------------------------------------------------------"
 
         cpuTimeStats =
@@ -94,8 +91,8 @@ instance Pretty BenchResult where
         mutTimeStats =
           "MUT:"    <> p mutTime
             <> "  " <> p (mkPercent mutTime cputime)
-            <> "  " <> p alloc
-            <> "  " <> pad 14 (pretty (DataRate alloc mutTime :: SomeDataRate))
+            <> "  " <> p allocated
+            <> "  " <> pad 14 (pretty (DataRate allocated mutTime :: SomeDataRate))
 
         gcTimeStats =
           "GC: "    <> p gcTime

@@ -24,6 +24,8 @@ import GHC.TypeLits
 
 import qualified Data.Vector as V
 
+import Control.DeepSeq
+
 -- Generic implementation of variance analysis. Simply:
 --
 -- > instance Vary <SomeType>
@@ -37,8 +39,12 @@ data Variance
     , maximum_ :: {-# UNPACK #-} !Double
     } deriving (Eq,Ord,Generic,ToJSON,FromJSON,Show)
 
+instance NFData Variance
+
 newtype Varied = Varied (HashMap String Variance)
- deriving (Show,Eq)
+ deriving (Show,Eq,Generic)
+
+instance NFData Varied
 
 {-# INLINE addToVariance #-}
 addToVariance :: Real a => a -> Variance -> Variance

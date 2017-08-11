@@ -46,10 +46,10 @@ import Simple.Types as Export
 _GCStats_size = 152
 
 {-# INLINE bench #-}
-bench :: NFData a => String -> IO a -> ((BenchResult,a) -> Test Sync b) -> Test Sync b
+bench :: NFData a => String -> IO a -> ((RuntimeStats,a) -> Test Sync b) -> Test Sync b
 bench nm f w =
     scope nm $ do
-        noteScoped "Running benchmark"
+        noteScoped "Benchmarking..."
         io yield  -- yield for printer to run
         io performGC -- cleanup when we get back
         (before, after, a) <-
@@ -63,32 +63,15 @@ bench nm f w =
                 return (before, after, a)
         cs <- currentScope
         let results =
-              let r = mkBenchResult cs before after
+              let r = mkRuntimeStats cs before after
               in r { collections = (collections r) - toCount (Count 1) }
         w (results,a)
-
--- | Given a scope, a list of BenchPreds partially applied to a base, a test to
--- benchmark, and a callback to run if a benchmark is persisted to disk
--- (either first run or all predicates succeed), run an automatic benchmark.
-autobench :: NFData a => String -> [BenchResult -> BenchResult -> Bool] -> IO a -> ((BenchResult,a) -> Test Sync b) -> Test Sync b
-autobench nm ps f w = do
-    bench nm f $ \(new,a) -> do
-        mayOld <- revealBench
-        case mayOld of
-          Nothing -> do
-            noteScoped "Autobench writing first results to disk."
-            persistBench new
-          Just old -> do
-            mapM_ (\f -> expect (f old new)) ps
-            noteScoped "Autobench writing improved results to disk."
-            persistBench new
-        w (new,a)
 
 -- rewrite to use directory on ghc and localstorage on ghcjs
 -- | Read a list of bench results from a file that were created
 -- with the a call to `writeBenches` with the given key.
 {-# INLINE readBenches #-}
-readBenches :: String -> Test Sync [BenchResult]
+readBenches :: String -> Test Sync [RuntimeStats]
 readBenches k = do
     cs <- currentScope
     let benchFile = "trivial/benchmarks/" <> show (abs $ hash cs + hash k) <> ".bench"
@@ -107,7 +90,7 @@ readBenches k = do
 -- readable by calling `readBenches` with the key given to `writeBenches`
 -- in this benchmark context.
 {-# INLINE writeBenches #-}
-writeBenches :: String -> [BenchResult] -> Test Sync ()
+writeBenches :: String -> [RuntimeStats] -> Test Sync ()
 writeBenches k brs = do
     cs <- currentScope
     let dir = "trivial/benchmarks/"
@@ -117,7 +100,7 @@ writeBenches k brs = do
 -- rewrite to use directory on ghc and localstorage on ghcjs
 -- | Read a bench file that was saved in the current scope with `writeBench`.
 {-# INLINE revealBench #-}
-revealBench :: Test Sync (Maybe BenchResult)
+revealBench :: Test Sync (Maybe RuntimeStats)
 revealBench = do
     cs <- currentScope
     let benchFile = "trivial/benchmarks/" <> show (abs $ hash cs) <> ".bench"
@@ -134,14 +117,14 @@ revealBench = do
 -- rewrite to use directory on ghc and localstorage on ghcjs
 -- | Persist a bench file that will only be available in this scope with `readBench`.
 {-# INLINE persistBench #-}
-persistBench :: BenchResult -> Test Sync ()
+persistBench :: RuntimeStats -> Test Sync ()
 persistBench br = do
     cs <- currentScope
     let dir = "trivial/benchmarks/"
     io $ createDirectoryIfMissing True dir
     io $ writeFile (dir <> show (abs $ hash cs)) (show br)
 
-type BenchPred a = a -> BenchResult -> BenchResult -> Bool
+type BenchPred a = a -> RuntimeStats -> RuntimeStats -> Bool
 
 data Feature = Garbage | GCs | Clock | Allocs | Mutation
   deriving (Eq,Show,Ord,Read,Enum)
@@ -156,10 +139,10 @@ data Predicate
   | Feature :<< ()
 
 data Measurable
-  = forall a. (Magnitude a, Base a, Improving a, Similar a, Pretty a) => M (BenchResult -> a)
+  = forall a. (Magnitude a, Base a, Improving a, Similar a, Pretty a) => M (RuntimeStats -> a)
 
 {-# INLINE constrain #-}
-constrain :: BenchResult -> BenchResult -> [Predicate] -> Test sync ()
+constrain :: RuntimeStats -> RuntimeStats -> [Predicate] -> Test sync ()
 constrain br1 br2 =
   mapM_ $ \p ->
     let pred =
@@ -183,8 +166,8 @@ constrain br1 br2 =
             Garbage  -> M $ copied
             GCs      -> M $ collections
             Clock    -> M $ cputime
-            Allocs   -> M $ alloc
-            Mutation -> M $ \a -> DataRate (alloc a) (cputime a) :: AllocationRate
+            Allocs   -> M $ allocated
+            Mutation -> M $ \a -> DataRate (allocated a) (cputime a) :: AllocationRate
     in case pred of
         (sc,f,g) -> scope (show f ++ sc) $
           let sel = selector f in
