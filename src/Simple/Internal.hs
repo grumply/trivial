@@ -2,6 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE BangPatterns #-}
 module Simple.Internal where
 
 import Simple.Internal.Base
@@ -26,87 +27,84 @@ import Data.Monoid
 {-# INLINE mkRuntimeStats #-}
 mkRuntimeStats :: String -> GCStats -> GCStats -> RuntimeStats
 mkRuntimeStats label before after =
-    let cpuElapsed  = Seconds (wallSeconds after)        - Seconds (wallSeconds before)
-        cputime     = Seconds (cpuSeconds after)         - Seconds (cpuSeconds before)
-        mutElapsed  = Seconds (mutatorWallSeconds after) - Seconds (mutatorWallSeconds before)
-        mutTime     = Seconds (mutatorCpuSeconds after)  - Seconds (mutatorCpuSeconds before)
-        allocated   = Bytes (bytesAllocated after)       - Bytes (bytesAllocated before)
-        peak        = Megabytes (peakMegabytesAllocated after) - Megabytes (peakMegabytesAllocated before)
-        used        = Bytes (currentBytesUsed after)     - Bytes (currentBytesUsed before)
-        cumulative  = Bytes (cumulativeBytesUsed after)  - Bytes (cumulativeBytesUsed before)
-        maxBytes    = Bytes (maxBytesUsed after)         - Bytes (maxBytesUsed before)
-        gcElapsed   = Seconds (gcWallSeconds after)      - Seconds (gcWallSeconds before)
-        gcTime      = Seconds (gcCpuSeconds after)       - Seconds (gcCpuSeconds before)
-        copyRate    = DataRate copied cpuElapsed
-        collections = Count (numGcs after)               - Count (numGcs before)
-        uncollected = Bytes (currentBytesUsed after)     - Bytes (currentBytesUsed before)
-        copied      = Bytes (bytesCopied after)          - Bytes (bytesCopied before)
-        slop        = Bytes (currentBytesSlop after)     - Bytes (currentBytesSlop before)
+    let !rs_cpuElapsed  = Seconds (wallSeconds after)        - Seconds (wallSeconds before)
+        !rs_cputime     = Seconds (cpuSeconds after)         - Seconds (cpuSeconds before)
+        !rs_mutElapsed  = Seconds (mutatorWallSeconds after) - Seconds (mutatorWallSeconds before)
+        !rs_mutTime     = Seconds (mutatorCpuSeconds after)  - Seconds (mutatorCpuSeconds before)
+        !rs_allocated   = Bytes (bytesAllocated after)       - Bytes (bytesAllocated before) - 152
+        !rs_peak        = Megabytes (peakMegabytesAllocated after) - Megabytes (peakMegabytesAllocated before)
+        !rs_used        = Bytes (currentBytesUsed after)     - Bytes (currentBytesUsed before) - 152
+        !rs_cumulative  = Bytes (cumulativeBytesUsed after)  - Bytes (cumulativeBytesUsed before)
+        !rs_maxBytes    = Bytes (maxBytesUsed after)         - Bytes (maxBytesUsed before)
+        !rs_gcElapsed   = Seconds (gcWallSeconds after)      - Seconds (gcWallSeconds before)
+        !rs_gcTime      = Seconds (gcCpuSeconds after)       - Seconds (gcCpuSeconds before)
+        !rs_collections = Count (numGcs after)               - Count (numGcs before)
+        !rs_uncollected = Bytes (currentBytesUsed after)     - Bytes (currentBytesUsed before)
+        !rs_copied      = Bytes (bytesCopied after)          - Bytes (bytesCopied before)
+        !rs_slop        = Bytes (currentBytesSlop after)     - Bytes (currentBytesSlop before)
     in RuntimeStats {..}
 
 data RuntimeStats = RuntimeStats
-    { label        :: !String
-    , cpuElapsed   :: {-# UNPACK #-}!Elapsed
-    , cputime      :: {-# UNPACK #-}!CPUTime
-    , mutElapsed   :: {-# UNPACK #-}!Elapsed
-    , mutTime      :: {-# UNPACK #-}!CPUTime
-    , allocated    :: {-# UNPACK #-}!Allocated
+    { rs_cpuElapsed   :: {-# UNPACK #-}!Elapsed
+    , rs_cputime      :: {-# UNPACK #-}!CPUTime
+    , rs_mutElapsed   :: {-# UNPACK #-}!Elapsed
+    , rs_mutTime      :: {-# UNPACK #-}!CPUTime
+    , rs_allocated    :: {-# UNPACK #-}!Allocated
     -- , mutated      :: {-# UNPACK #-}!Mutated
-    , peak         :: {-# UNPACK #-}!Peak
-    , used         :: {-# UNPACK #-}!Used
-    , cumulative   :: {-# UNPACK #-}!Cumulative
-    , maxBytes     :: {-# UNPACK #-}!Max
-    , gcElapsed    :: {-# UNPACK #-}!Elapsed
-    , gcTime       :: {-# UNPACK #-}!CPUTime
-    , copyRate     :: {-# UNPACK #-}!CopyRate
-    , collections  :: {-# UNPACK #-}!Collections
-    , uncollected  :: {-# UNPACK #-}!Live
-    , copied       :: {-# UNPACK #-}!Copied
-    , slop         :: {-# UNPACK #-}!Slop
+    , rs_peak         :: {-# UNPACK #-}!Peak
+    , rs_used         :: {-# UNPACK #-}!Used
+    , rs_cumulative   :: {-# UNPACK #-}!Cumulative
+    , rs_maxBytes     :: {-# UNPACK #-}!Max
+    , rs_gcElapsed    :: {-# UNPACK #-}!Elapsed
+    , rs_gcTime       :: {-# UNPACK #-}!CPUTime
+    , rs_collections  :: {-# UNPACK #-}!Collections
+    , rs_uncollected  :: {-# UNPACK #-}!Live
+    , rs_copied       :: {-# UNPACK #-}!Copied
+    , rs_slop         :: {-# UNPACK #-}!Slop
     } deriving (Generic, Read, Show, Eq, ToJSON, FromJSON)
 
 instance Vary RuntimeStats
 
-instance Pretty RuntimeStats where
-    pretty RuntimeStats {..} =
-        unlines
-            [ ""
-            , divider
-            , header2
-            , divider
-            , cpuTimeStats
-            , mutTimeStats
-            , gcTimeStats
-            , ""
-            , "Collections:" <> pad 11 (pretty collections)
-            , "Leftover:   " <> pad 11 (pretty uncollected)
-            ]
-      where
-        header2 = "                Time           |       Space |    Throughput"
-        divider = "     -------------------------------------------------------"
+-- instance Pretty RuntimeStats where
+--     pretty RuntimeStats {..} =
+--         unlines
+--             [ ""
+--             , divider
+--             , header2
+--             , divider
+--             , cpuTimeStats
+--             , mutTimeStats
+--             , gcTimeStats
+--             , ""
+--             , "Collections:" <> pad 11 (pretty collections)
+--             , "Leftover:   " <> pad 11 (pretty uncollected)
+--             ]
+--       where
+--         header2 = "                Time           |       Space |    Throughput"
+--         divider = "     -------------------------------------------------------"
 
-        cpuTimeStats =
-          "CPU:"    <> p cputime
+--         cpuTimeStats =
+--           "CPU:"    <> p cputime
 
-        mutTimeStats =
-          "MUT:"    <> p mutTime
-            <> "  " <> p (mkPercent mutTime cputime)
-            <> "  " <> p allocated
-            <> "  " <> pad 14 (pretty (DataRate allocated mutTime :: SomeDataRate))
+--         mutTimeStats =
+--           "MUT:"    <> p mutTime
+--             <> "  " <> p (mkPercent mutTime cputime)
+--             <> "  " <> p allocated
+--             <> "  " <> pad 14 (pretty (DataRate allocated mutTime :: SomeDataRate))
 
-        gcTimeStats =
-          "GC: "    <> p gcTime
-            <> "  " <> p (mkPercent gcTime cputime)
-            <> "  " <> p copied
-            <> "  " <> pad 14 (pretty (DataRate copied gcTime :: SomeDataRate))
+--         gcTimeStats =
+--           "GC: "    <> p gcTime
+--             <> "  " <> p (mkPercent gcTime cputime)
+--             <> "  " <> p copied
+--             <> "  " <> pad 14 (pretty (DataRate copied gcTime :: SomeDataRate))
 
-        p :: forall p. Pretty p => p -> String
-        p = pad 12 . pretty
+--         p :: forall p. Pretty p => p -> String
+--         p = pad 12 . pretty
 
-        pad :: Int -> String -> String
-        pad n s =
-          let l = length s
-          in replicate (n - l) ' ' <> s
+--         pad :: Int -> String -> String
+--         pad n s =
+--           let l = length s
+--           in replicate (n - l) ' ' <> s
 
 
     -- let cpuElapsed = wallSeconds after - wallSeconds before

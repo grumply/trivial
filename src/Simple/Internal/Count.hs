@@ -56,7 +56,7 @@ instance IsCount ByteUsageSamples where
 -- Collection Count
 
 newtype Collections = Collections { getCollections :: SomeCount }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON,Base,Magnitude,Similar)
+  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,ToJSON,FromJSON,Base,Magnitude,Similar)
 
 instance Vary Collections
 

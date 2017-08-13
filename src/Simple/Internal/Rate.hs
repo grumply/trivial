@@ -41,7 +41,12 @@ viewPerSecond :: IsTime t => PerSecond -> (Double,t)
 viewPerSecond (PerSecond r) = (r,Seconds 1)
 
 mkPerSecond :: (Real a, Real b) => a -> b -> PerSecond
-mkPerSecond b t = PerSecond (realToFrac b / realToFrac t)
+mkPerSecond b t =
+  let time = realToFrac t
+  in if time == 0 then
+       PerSecond 0
+     else
+       PerSecond (realToFrac b / time)
 
 pattern Rate :: (IsTime t, IsRate r) => Double -> t -> r
 pattern Rate d t <- (viewPerSecond . fromRate -> (d,t)) where

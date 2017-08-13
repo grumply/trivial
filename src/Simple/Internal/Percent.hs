@@ -22,4 +22,9 @@ instance Pretty Percent where
       | otherwise = printf "%.2f%%" (100 * r)
 
 mkPercent :: (Real a, Real b) => a -> b -> Percent
-mkPercent a b = Percent $ realToFrac a / realToFrac b
+mkPercent a b =
+  let b' = realToFrac b
+  in if b' == 0 then
+       Percent 0
+     else
+       Percent $ realToFrac a / b'

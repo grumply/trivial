@@ -52,7 +52,13 @@ viewDataRate :: (IsDataRate r, IsSpace s, IsTime t) => r -> (s,t)
 viewDataRate (fromDataRate -> SomeDataRate r) = (Bytes (round r),Seconds 1)
 
 mkDataRate :: (IsDataRate r, IsSpace s, IsTime t) => s -> t -> r
-mkDataRate s t = toDataRate $ SomeDataRate (realToFrac (fromSpace s) / realToFrac (fromTime t))
+mkDataRate s t =
+  let time = realToFrac (fromTime t)
+  in toDataRate $
+       if time == 0 then
+         SomeDataRate 0
+       else
+         SomeDataRate (realToFrac (fromSpace s) / time)
 
 pattern DataRate :: (IsSpace s, IsTime t, IsDataRate r) => s -> t -> r
 pattern DataRate s t <- (viewDataRate -> (s,t)) where
@@ -72,12 +78,14 @@ instance IsDataRate CopyRate where
 
 instance Improving CopyRate -- more throughput is better
 
+instance Magnitude CopyRate
+
 instance Base CopyRate where
   base _ = 2
 
 instance Similar CopyRate where
-  sim b (DataRate (Megabytes mbps :: Space) (_ :: Time))
-            (DataRate (Megabytes mbps':: Space) (_ :: Time))
+  sim b (DataRate (Megabytes mbps :: SomeSpace) (_ :: SomeTime))
+            (DataRate (Megabytes mbps':: SomeSpace) (_ :: SomeTime))
     = sim b mbps mbps'
 
 ----------------------------------------
@@ -101,7 +109,7 @@ instance Base AllocationRate where
 
 instance Similar AllocationRate where
   sim b
-    (DataRate (Megabytes mbps :: Space) (_ :: Time))
-    (DataRate (Megabytes mbps' :: Space) (_ :: Time))
+    (DataRate (Megabytes mbps :: SomeSpace) (_ :: SomeTime))
+    (DataRate (Megabytes mbps' :: SomeSpace) (_ :: SomeTime))
       = sim b mbps mbps'
 
