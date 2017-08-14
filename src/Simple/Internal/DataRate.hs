@@ -31,9 +31,15 @@ instance IsDataRate Double where
   fromDataRate = SomeDataRate
 
 newtype SomeDataRate = SomeDataRate { getDataRate :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,RealFloat,Read,Show,ToJSON,FromJSON)
 
 instance Vary SomeDataRate
+
+instance Improving SomeDataRate
+
+instance Magnitude SomeDataRate
+
+instance Similar SomeDataRate
 
 instance Pretty SomeDataRate where
     pretty (SomeDataRate t)
@@ -49,7 +55,7 @@ instance IsDataRate SomeDataRate where
   fromDataRate = id
 
 viewDataRate :: (IsDataRate r, IsSpace s, IsTime t) => r -> (s,t)
-viewDataRate (fromDataRate -> SomeDataRate r) = (Bytes (round r),Seconds 1)
+viewDataRate (fromDataRate -> SomeDataRate r) = (Bytes r,Seconds 1)
 
 mkDataRate :: (IsDataRate r, IsSpace s, IsTime t) => s -> t -> r
 mkDataRate s t =
@@ -68,7 +74,7 @@ pattern DataRate s t <- (viewDataRate -> (s,t)) where
 -- GC copy rate
 
 newtype CopyRate = CopyRate { getCopyRate :: SomeDataRate }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON,Pretty)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,RealFloat,Read,Show,ToJSON,FromJSON,Pretty)
 
 instance Vary CopyRate
 
@@ -92,7 +98,7 @@ instance Similar CopyRate where
 -- Allocation Rate
 
 newtype AllocationRate = AllocationRate { getAllocationRate :: SomeDataRate }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON,Pretty)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,RealFloat,Read,Show,ToJSON,FromJSON,Pretty)
 
 instance Vary AllocationRate
 

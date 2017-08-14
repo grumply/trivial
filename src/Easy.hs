@@ -52,7 +52,7 @@ module Easy
 
   , scope
 
-  , note, note', noteScoped
+  , note, note', noteScoped, notep
   , binary, hex, octal
 
   , run, runOnly, rerunOnly, tests
@@ -101,6 +101,8 @@ import           Control.Monad.Managed
 
 import           Data.Char
 import           Numeric
+
+import           Simple.Internal.Pretty
 
 data Status = Failed | Passed !Int | Skipped | Completed
 
@@ -280,6 +282,11 @@ note msg = do
 -- | Log a showable value
 note' :: Show s => s -> Test sync ()
 note' = note . show
+
+{-# INLINE notep #-}
+-- | Log a pretty-able value
+notep :: Pretty p => p -> Test sync ()
+notep = note . pretty
 
 {-# INLINE binary #-}
 binary :: Integral i => i -> String

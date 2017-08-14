@@ -20,6 +20,7 @@ library
                       Simple.Internal.Base
                       Simple.Internal.Count
                       Simple.Internal.DataRate
+                      Simple.Internal.Factor
                       Simple.Internal.Improving
                       Simple.Internal.Magnitude
                       Simple.Internal.Percent

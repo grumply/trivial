@@ -7,6 +7,7 @@ module Simple.Types (module Simple.Types, module Export) where
 import Simple.Internal.Base as Export
 import Simple.Internal.Count as Export
 import Simple.Internal.DataRate as Export
+import Simple.Internal.Factor as Export
 import Simple.Internal.Improving as Export
 import Simple.Internal.Magnitude as Export
 import Simple.Internal.Pretty as Export

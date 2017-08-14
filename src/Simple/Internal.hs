@@ -31,17 +31,17 @@ mkRuntimeStats label before after =
         !rs_cputime     = Seconds (cpuSeconds after)         - Seconds (cpuSeconds before)
         !rs_mutElapsed  = Seconds (mutatorWallSeconds after) - Seconds (mutatorWallSeconds before)
         !rs_mutTime     = Seconds (mutatorCpuSeconds after)  - Seconds (mutatorCpuSeconds before)
-        !rs_allocated   = Bytes (bytesAllocated after)       - Bytes (bytesAllocated before) - 152
-        !rs_peak        = Megabytes (peakMegabytesAllocated after) - Megabytes (peakMegabytesAllocated before)
-        !rs_used        = Bytes (currentBytesUsed after)     - Bytes (currentBytesUsed before) - 152
-        !rs_cumulative  = Bytes (cumulativeBytesUsed after)  - Bytes (cumulativeBytesUsed before)
-        !rs_maxBytes    = Bytes (maxBytesUsed after)         - Bytes (maxBytesUsed before)
+        !rs_allocated   = Bytes (realToFrac $ bytesAllocated after)       - Bytes (realToFrac $ bytesAllocated before) - 152
+        !rs_peak        = Megabytes (realToFrac $ peakMegabytesAllocated after) - Megabytes (realToFrac $ peakMegabytesAllocated before)
+        !rs_used        = Bytes (realToFrac $ currentBytesUsed after)     - Bytes (realToFrac $ currentBytesUsed before) - 152
+        !rs_cumulative  = Bytes (realToFrac $ cumulativeBytesUsed after)  - Bytes (realToFrac $ cumulativeBytesUsed before)
+        !rs_maxBytes    = Bytes (realToFrac $ maxBytesUsed after)         - Bytes (realToFrac $ maxBytesUsed before)
         !rs_gcElapsed   = Seconds (gcWallSeconds after)      - Seconds (gcWallSeconds before)
         !rs_gcTime      = Seconds (gcCpuSeconds after)       - Seconds (gcCpuSeconds before)
-        !rs_collections = Count (numGcs after)               - Count (numGcs before)
-        !rs_uncollected = Bytes (currentBytesUsed after)     - Bytes (currentBytesUsed before)
-        !rs_copied      = Bytes (bytesCopied after)          - Bytes (bytesCopied before)
-        !rs_slop        = Bytes (currentBytesSlop after)     - Bytes (currentBytesSlop before)
+        !rs_collections = Count (realToFrac $ numGcs after)               - Count (realToFrac $ numGcs before)
+        !rs_uncollected = Bytes (realToFrac $ currentBytesUsed after)     - Bytes (realToFrac $ currentBytesUsed before)
+        !rs_copied      = Bytes (realToFrac $ bytesCopied after)          - Bytes (realToFrac $ bytesCopied before)
+        !rs_slop        = Bytes (realToFrac $ currentBytesSlop after)     - Bytes (realToFrac $ currentBytesSlop before)
     in RuntimeStats {..}
 
 data RuntimeStats = RuntimeStats
@@ -64,6 +64,8 @@ data RuntimeStats = RuntimeStats
     } deriving (Generic, Read, Show, Eq, ToJSON, FromJSON)
 
 instance Vary RuntimeStats
+instance Similar RuntimeStats
+instance Magnitude RuntimeStats
 
 -- instance Pretty RuntimeStats where
 --     pretty RuntimeStats {..} =

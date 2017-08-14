@@ -12,7 +12,7 @@ import Data.Aeson
 import Text.Printf
 
 newtype Percent = Percent { getPercent :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,RealFloat,Read,Show,ToJSON,FromJSON)
 
 instance Vary Percent
 
@@ -27,4 +27,4 @@ mkPercent a b =
   in if b' == 0 then
        Percent 0
      else
-       Percent $ realToFrac a / b'
+       Percent $ realToFrac (round ((realToFrac a / b') * 100)) / 100

@@ -26,9 +26,12 @@ class IsRate r where
   fromRate :: r -> PerSecond
 
 newtype PerSecond = PerSecond { getPerSecond :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,RealFloat,Read,Show,ToJSON,FromJSON)
 
 instance Vary PerSecond
+instance Similar PerSecond
+instance Magnitude PerSecond
+instance Improving PerSecond
 
 instance  Pretty PerSecond where
     pretty (PerSecond r) = printf "%.2f/s" r
@@ -56,21 +59,21 @@ pattern Rate d t <- (viewPerSecond . fromRate -> (d,t)) where
 -- Collection Rate
 
 newtype CollectionRate = CollectionRate { getCollectionRate :: PerSecond }
-  deriving (Generic,Eq,Ord,Num,Real,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,RealFloat,Read,Show,ToJSON,FromJSON)
 
 instance Vary CollectionRate
+instance Similar CollectionRate
+instance Magnitude CollectionRate
 
 instance IsRate CollectionRate where
   toRate = CollectionRate
   fromRate (CollectionRate ps) = ps
 
 instance Improving CollectionRate where
-  improving c1 c2 = c1 > c2
+  improving = (>)
   improvingShow _ = ">"
 
 instance Base CollectionRate
 
 instance Pretty CollectionRate where
   pretty (CollectionRate (PerSecond c)) = printf "%d collections/s" c
-
-instance Similar CollectionRate

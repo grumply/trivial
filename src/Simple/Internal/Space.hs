@@ -23,8 +23,8 @@ class IsSpace a where
   toSpace :: SomeSpace -> a
   fromSpace :: a -> SomeSpace
 
-newtype SomeSpace = SomeSpace { getBytes :: Int64 }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,ToJSON,FromJSON)
+newtype SomeSpace = SomeSpace { getBytes :: Double }
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Fractional,Floating,RealFloat,Read,Show,ToJSON,FromJSON)
 
 instance Vary SomeSpace
 
@@ -41,39 +41,45 @@ instance IsSpace SomeSpace where
   toSpace = id
   fromSpace = id
 
-pattern Bytes :: IsSpace b => Int64 -> b
+pattern Bytes :: IsSpace b => Double -> b
 pattern Bytes bs <- (getBytes . fromSpace -> bs) where
   Bytes (toSpace . SomeSpace -> s) = s
 
-pattern Kilobytes :: IsSpace b => Int64 -> b
-pattern Kilobytes kbs <- ((`div` 2^10) . getBytes . fromSpace -> kbs) where
+pattern Kilobytes :: IsSpace b => Double -> b
+pattern Kilobytes kbs <- ((/ 2^10) . getBytes . fromSpace -> kbs) where
   Kilobytes (toSpace . SomeSpace . (*2^10) -> s) = s
 
-pattern Megabytes :: IsSpace b => Int64 -> b
-pattern Megabytes mbs <- ((`div` 2^20) . getBytes . fromSpace -> mbs) where
+pattern Megabytes :: IsSpace b => Double -> b
+pattern Megabytes mbs <- ((/ 2^20) . getBytes . fromSpace -> mbs) where
   Megabytes (toSpace . SomeSpace . (*2^20) -> s) = s
 
-pattern Gigabytes :: IsSpace b => Int64 -> b
-pattern Gigabytes gbs <- ((`div` 2^30) . getBytes . fromSpace -> gbs) where
+pattern Gigabytes :: IsSpace b => Double -> b
+pattern Gigabytes gbs <- ((/ 2^30) . getBytes . fromSpace -> gbs) where
   Gigabytes (toSpace . SomeSpace . (*2^30) -> s) = s
 
-pattern Terabytes :: IsSpace b => Int64 -> b
-pattern Terabytes tbs <- ((`div` 2^40) . getBytes . fromSpace -> tbs) where
+pattern Terabytes :: IsSpace b => Double -> b
+pattern Terabytes tbs <- ((/ 2^40) . getBytes . fromSpace -> tbs) where
   Terabytes (toSpace . SomeSpace . (*2^40) -> s) = s
 
 instance Pretty SomeSpace where
     pretty (SomeSpace b)
-        | b < 2^10  = printf "%d B" b
-        | b < 2^20  = printf "%.1f KB" (realToFrac b / 2^10 :: Double)
-        | b < 2^30  = printf "%.1f MB" (realToFrac b / 2^20 :: Double)
-        | b < 2^40  = printf "%.1f GB" (realToFrac b / 2^30 :: Double)
-        | otherwise = printf "%.1f TB" (realToFrac b / 2^40 :: Double)
+        | b < 2**(-40) = printf "%.2f aB" (b * 2^50)
+        | b < 2**(-30) = printf "%.2f fB" (b * 2^40)
+        | b < 2**(-20) = printf "%.2f pB" (b * 2^30)
+        | b < 2**(-20) = printf "%.2f nB" (b * 2^30)
+        | b < 2**(-10) = printf "%.2f μB" (b * 2^20)
+        | b < 1        = printf "%.2f mB" (b * 2^10)
+        | b < 2^10     = printf "%.0f B" b
+        | b < 2^20     = printf "%.2f KB" (b / 2^10)
+        | b < 2^30     = printf "%.2f MB" (b / 2^20)
+        | b < 2^40     = printf "%.2f GB" (b / 2^30)
+        | otherwise    = printf "%.2f TB" (b / 2^40)
 
 ----------------------------------------
 -- Mutated Bytes
 
 newtype Mutated = Mutated { getMutated :: SomeSpace }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance Vary Mutated
 
@@ -92,7 +98,7 @@ instance Improving Mutated where
 -- Allocated Bytes
 
 newtype Allocated = Allocated { getAllocated :: SomeSpace }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance Vary Allocated
 
@@ -105,12 +111,13 @@ instance Similar Allocated where
 
 instance Improving Allocated where
   improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
+  improvingShow _ = ">"
 
 ----------------------------------------
 -- GC Slop
 
 newtype Slop = Slop { getSlop :: SomeSpace }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance Vary Slop
 
@@ -129,7 +136,7 @@ instance Improving Slop where
 -- Max Bytes
 
 newtype Max = Max { getMax :: SomeSpace }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance Vary Max
 
@@ -148,7 +155,7 @@ instance Improving Max where
 -- Cumulative Bytes
 
 newtype Cumulative = Cumulative { getCumulative :: SomeSpace }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance Vary Cumulative
 
@@ -167,7 +174,7 @@ instance Improving Cumulative where
 -- Copied Bytes
 
 newtype Copied = Copied { getCopied :: SomeSpace }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance Vary Copied
 
@@ -186,7 +193,7 @@ instance Improving Copied where
 -- Bytes Used
 
 newtype Used = Used { getUsed :: SomeSpace }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,Pretty,ToJSON,FromJSON,Magnitude,Base)
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Magnitude,Base)
 
 instance Vary Used
 
@@ -205,7 +212,7 @@ instance Improving Used where
 -- Max Slop
 
 newtype MaxSlop = MaxSlop { getMaxSlop :: SomeSpace }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance Vary MaxSlop
 
@@ -224,7 +231,7 @@ instance Improving MaxSlop where
 -- Peak Allocated
 
 newtype Peak = Peak { getPeak :: SomeSpace }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance Vary Peak
 
@@ -243,7 +250,7 @@ instance Improving Peak where
 -- Live Bytes
 
 newtype Live = Live { getLive :: SomeSpace }
-  deriving (Generic,Eq,Ord,Num,Real,Enum,Integral,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
 
 instance Vary Live
 

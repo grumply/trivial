@@ -21,20 +21,22 @@ import Data.Int
 import Data.Aeson
 
 newtype SomeTime = SomeTime { getSeconds :: Double }
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,Read,Show,ToJSON,FromJSON)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,RealFloat,Read,Show,ToJSON,FromJSON)
 instance Vary SomeTime
 instance Base SomeTime
 instance Magnitude SomeTime
 
 instance Pretty SomeTime where
     pretty (SomeTime d)
-        | d < 0.000000001 = printf     "%.0fps" (d * 1000000000000)
-        | d < 0.000001    = printf     "%.3fns" (d * 1000000000)
-        | d < 0.001       = printf     "%.3fμs" (d * 1000000)
-        | d < 1           = printf     "%.3fms" (d * 1000)
-        | d < 60          = printf     "%.3fs"   d
-        | d < 60^2        = printf "%.0fm %ds"  (d / 60)   (roundi d `mod` 60)
-        | otherwise       = printf "%.0fh %dm"  (d / 60^2) (roundi d `mod` 60^2)
+        | d < 0.000000000000001 = printf     "%.0fas" (d * 1000000000000000)
+        | d < 0.000000000001    = printf     "%.0ffs" (d * 1000000000000000)
+        | d < 0.000000001       = printf     "%.0fps" (d * 1000000000000)
+        | d < 0.000001          = printf     "%.3fns" (d * 1000000000)
+        | d < 0.001             = printf     "%.3fμs" (d * 1000000)
+        | d < 1                 = printf     "%.3fms" (d * 1000)
+        | d < 60                = printf     "%.3fs"   d
+        | d < 60^2              = printf "%.0fm %ds"  (d / 60)   (roundi d `mod` 60)
+        | otherwise             = printf "%.0fh %dm"  (d / 60^2) (roundi d `mod` 60^2)
       where
         roundi :: Double -> Int
         roundi = round
@@ -83,7 +85,7 @@ pattern Picoseconds s <- ((* 1000000000000) . getSeconds . fromTime -> s) where
 -- Elapsed time; wall clock
 
 newtype Elapsed = Elapsed SomeTime
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,Read,Show,ToJSON,FromJSON,Pretty,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,RealFloat,Read,Show,ToJSON,FromJSON,Pretty,Magnitude)
 
 instance Vary Elapsed
 
@@ -110,7 +112,7 @@ class HasElapsed a where
 -- CPUTime; cpu clock
 
 newtype CPUTime = CPUTime SomeTime
-  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,Read,Show,ToJSON,FromJSON,Pretty,Magnitude)
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,RealFloat,Read,Show,ToJSON,FromJSON,Pretty,Magnitude)
 
 instance Vary CPUTime
 
