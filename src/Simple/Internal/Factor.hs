@@ -37,6 +37,7 @@ viewFactor :: (Fractional a,Real b,IsFactor f) => f -> (a,b)
 viewFactor (fromFactor -> SomeFactor f) = (realToFrac f,1)
 
 mkFactor :: (Real a,Real b,IsFactor f) => a -> b -> f
+mkFactor a 0 = toFactor $ SomeFactor 0
 mkFactor a b = toFactor $ SomeFactor $ realToFrac a / realToFrac b
 
 pattern Factor :: (Real a, Fractional a, Real b, IsFactor f) => a -> b -> f

@@ -275,7 +275,9 @@ noteScoped msg = do
 note :: String -> Test sync ()
 note msg = do
   noter <- asks noter
-  liftIO $ noter msg
+  liftIO $ do
+    noter msg
+    yield
   pure ()
 
 {-# INLINE note' #-}

@@ -144,13 +144,13 @@ instance Pretty BenchResult where
           "MUT:"    <> p (mut br)
             <> "  " <> p (mkPercent (mut br) (cpu br))
             <> "  " <> p (alloc br)
-            <> "  " <> pad 14 (pretty (allocRate br))
+            <> "  " <> p (allocRate br)
 
         gcTimeStats =
           "GC: "    <> p (gc br)
             <> "  " <> p (mkPercent (gc br) (cpu br))
             <> "  " <> p (copy br)
-            <> "  " <> pad 14 (pretty (copyRate br))
+            <> "  " <> p (copyRate br)
 
         p :: forall p. Pretty p => p -> String
         p = pad 12 . pretty
@@ -197,64 +197,48 @@ instance Pretty BenchDiff where
             , gcTimeStats
             ]
       where
-        prettyFactorReverse :: SomeFactor -> String
-        prettyFactorReverse f =
-          pad 21 $
-            if isNaN f then
-              "\27[00m" <> pretty (SomeFactor 0) <> "\27[0m"
-            else if f < 0.84 then
-              "\27[91m" <> pretty f <> "\27[0m"
-            else if f > 1.15 then
-              "\27[92m" <> pretty f <> "\27[0m"
-            else
-              "\27[00m" <> pretty f <> "\27[0m"
-
-        prettyFactor :: SomeFactor -> String
-        prettyFactor f =
-          pad 21 $
-            if isNaN f then
-              "\27[00m" <> pretty (SomeFactor 0) <> "\27[0m"
-            else if f < 0.85 then
-              "\27[92m" <> pretty f <> "\27[0m"
-            else if f > 1.15 then
-              "\27[91m" <> pretty f <> "\27[0m"
-            else
-              "\27[00m" <> pretty f <> "\27[0m"
-
         header2 = "            Time |    Relative |       Space |    Throughput"
 
         divider = "     -------------------------------------------------------"
 
         cpuTimeStats =
-          "CPU:"    <> prettyFactor bd_cpu
+          "CPU:"    <> p bd_cpu
 
+        relativeMutationTime :: SomeFactor
         relativeMutationTime =
-          (/) (realToFrac (mkPercent (mut bd_bench1) (cpu bd_bench1)))
-              (realToFrac (mkPercent (mut bd_bench2) (cpu bd_bench2)))
+            Factor
+                (mkPercent (mut bd_bench2) (cpu bd_bench2))
+                (mkPercent (mut bd_bench1) (cpu bd_bench1))
 
+        relativeGCTime :: SomeFactor
         relativeGCTime =
-          (/) (realToFrac (mkPercent (gc bd_bench1) (cpu bd_bench1)))
-              (realToFrac (mkPercent (gc bd_bench2) (cpu bd_bench2)))
+            Factor
+                (mkPercent (gc bd_bench2) (cpu bd_bench2))
+                (mkPercent (gc bd_bench1) (cpu bd_bench1))
 
+        allocRateFactor :: SomeFactor
         allocRateFactor =
-          (/) (realToFrac (allocRate bd_bench1))
-              (realToFrac (allocRate bd_bench2))
+            Factor
+                (allocRate bd_bench2)
+                (allocRate bd_bench1)
 
+        copyRateFactor :: SomeFactor
         copyRateFactor =
-          (/) (realToFrac (copyRate bd_bench1))
-              (realToFrac (copyRate bd_bench2))
+            Factor
+                (copyRate bd_bench2)
+                (copyRate bd_bench1)
 
         mutTimeStats =
-          "MUT:"    <> prettyFactor bd_mut
-            <> "  " <> prettyFactor relativeMutationTime
-            <> "  " <> prettyFactor bd_alloc
-            <> "    " <> prettyFactorReverse allocRateFactor
+          "MUT:"    <> p bd_mut
+            <> "  " <> p relativeMutationTime
+            <> "  " <> p bd_alloc
+            <> "    " <> p allocRateFactor
 
         gcTimeStats =
-          "GC: "    <> prettyFactor bd_gc
-            <> "  " <> prettyFactor relativeGCTime
-            <> "  " <> prettyFactor bd_copy
-            <> "    " <> prettyFactorReverse copyRateFactor
+          "GC: "    <> p bd_gc
+            <> "  " <> p relativeGCTime
+            <> "  " <> p bd_copy
+            <> "    " <> p copyRateFactor
 
         p :: forall p. Pretty p => p -> String
         p = pad 12 . pretty
@@ -304,84 +288,62 @@ instance Pretty Report where
           "Old MUT:"    <> p (mut bd_bench1)
             <> "  " <> p (mkPercent (mut bd_bench1) (cpu bd_bench1))
             <> "  " <> p (alloc bd_bench1)
-            <> "  " <> pad 14 (pretty (allocRate bd_bench1))
+            <> "  " <> p (allocRate bd_bench1)
 
         newMutTimeStats =
           "New MUT:"    <> p (mut bd_bench2)
             <> "  " <> p (mkPercent (mut bd_bench2) (cpu bd_bench2))
             <> "  " <> p (alloc bd_bench2)
-            <> "  " <> pad 14 (pretty (allocRate bd_bench2))
+            <> "  " <> p (allocRate bd_bench2)
 
         oldGcTimeStats =
           "Old GC: "    <> p (gc bd_bench1)
             <> "  " <> p (mkPercent (gc bd_bench1) (cpu bd_bench1))
             <> "  " <> p (copy bd_bench1)
-            <> "  " <> pad 14 (pretty (copyRate bd_bench1))
+            <> "  " <> p (copyRate bd_bench1)
 
         newGcTimeStats =
           "New GC: "    <> p (gc bd_bench2)
             <> "  " <> p (mkPercent (gc bd_bench2) (cpu bd_bench2))
             <> "  " <> p (copy bd_bench2)
-            <> "  " <> pad 14 (pretty (copyRate bd_bench2))
-
-        prettyFactorReverse :: SomeFactor -> String
-        prettyFactorReverse f =
-          pad 21 $
-            if isNaN f then
-              "\27[00m" <> pretty (SomeFactor 0) <> "\27[0m"
-            else if f < 0.84 then
-              "\27[91m" <> pretty f <> "\27[0m"
-            else if f > 1.15 then
-              "\27[92m" <> pretty f <> "\27[0m"
-            else
-              "\27[00m" <> pretty f <> "\27[0m"
-
-        prettyFactor :: SomeFactor -> String
-        prettyFactor f =
-          pad 21 $
-            if isNaN f then
-              "\27[00m" <> pretty (SomeFactor 0) <> "\27[0m"
-            else if f < 0.85 then
-              "\27[92m" <> pretty f <> "\27[0m"
-            else if f > 1.15 then
-              "\27[91m" <> pretty f <> "\27[0m"
-            else
-              "\27[00m" <> pretty f <> "\27[0m"
+            <> "  " <> p (copyRate bd_bench2)
 
         header2 = "                Time |    Relative |       Space |    Throughput"
 
         divider = "         -------------------------------------------------------"
 
         cpuTimeDiff =
-          "Change: "    <> prettyFactor bd_cpu
+          "Change: "    <> p bd_cpu
 
+        relativeMutationTime :: SomeFactor
         relativeMutationTime =
-          (/) (realToFrac (mkPercent (mut bd_bench1) (cpu bd_bench1)))
-              (realToFrac (mkPercent (mut bd_bench2) (cpu bd_bench2)))
+          Factor (mkPercent (mut bd_bench2) (cpu bd_bench2))
+                 (mkPercent (mut bd_bench1) (cpu bd_bench1))
 
+        relativeGCTime :: SomeFactor
         relativeGCTime =
-          (/) (realToFrac (mkPercent (gc bd_bench1) (cpu bd_bench1)))
-              (realToFrac (mkPercent (gc bd_bench2) (cpu bd_bench2)))
+          Factor (mkPercent (gc bd_bench2) (cpu bd_bench2))
+                 (mkPercent (gc bd_bench1) (cpu bd_bench1))
 
+        allocRateFactor :: SomeFactor
         allocRateFactor =
-          (/) (realToFrac (allocRate bd_bench1))
-              (realToFrac (allocRate bd_bench2))
+          Factor (allocRate bd_bench2) (allocRate bd_bench1)
 
+        copyRateFactor :: SomeFactor
         copyRateFactor =
-          (/) (realToFrac (copyRate bd_bench1))
-              (realToFrac (copyRate bd_bench2))
+          Factor (copyRate bd_bench2) (copyRate bd_bench1)
 
         mutTimeDiff =
-          "Change: "    <> prettyFactor bd_mut
-            <> "  " <> prettyFactor relativeMutationTime
-            <> "  " <> prettyFactor bd_alloc
-            <> "    " <> prettyFactor allocRateFactor
+          "Change: "  <> p bd_mut
+            <> "  "   <> p relativeMutationTime
+            <> "  "   <> p bd_alloc
+            <> "  " <> p allocRateFactor
 
         gcTimeDiff =
-          "Change: "    <> prettyFactor bd_gc
-            <> "  " <> prettyFactor relativeGCTime
-            <> "  " <> prettyFactor bd_copy
-            <> "    " <> prettyFactor copyRateFactor
+          "Change: "  <> p bd_gc
+            <> "  "   <> p relativeGCTime
+            <> "  "   <> p bd_copy
+            <> "  " <> p copyRateFactor
 
         p :: forall p. Pretty p => p -> String
         p = pad 12 . pretty
@@ -423,7 +385,6 @@ nf :: (NFData a) => String -> (b -> a) -> b -> Test Sync BenchResult
 nf nm f b = scope nm $ do
     noteScoped "running..."
     io $ do
-      yield
       let rs = 1
       (before,after) <- execute (round rs)
       run (mkBenchResult rs before after)
@@ -431,7 +392,7 @@ nf nm f b = scope nm $ do
     {-# INLINE run #-}
     run :: BenchResult -> IO BenchResult
     run br
-      | dur br < Milliseconds 10 = do
+      | dur br < Milliseconds 100 = do
           let rs = 10 * runs br
           (before,after) <- execute (round rs)
           run $ mkBenchResult rs before after
@@ -547,7 +508,6 @@ whnf :: String -> (b -> a) -> b -> Test Sync BenchResult
 whnf nm f b = scope nm $ do
     noteScoped "running..."
     io $ do
-      yield
       let rs = 1
       (before,after) <- execute (round rs)
       run (mkBenchResult rs before after)
@@ -555,7 +515,7 @@ whnf nm f b = scope nm $ do
     {-# INLINE run #-}
     run :: BenchResult -> IO BenchResult
     run br
-      | dur br < Milliseconds 10 = do
+      | dur br < Milliseconds 100 = do
           let rs = 10 * runs br
           (before,after) <- execute (round rs)
           run $ mkBenchResult rs before after
