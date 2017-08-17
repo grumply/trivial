@@ -232,8 +232,8 @@ run' seed note allow (Test t) = do
             note $ "    " ++ intercalate "\n    " (map show failures)
             note ""
             note $ "  To rerun with same random seed:\n"
-            note $ "    EasyTest.rerun " ++ show seed
-            note $ "    EasyTest.rerunOnly " ++ show seed ++ " " ++ "\"" ++ hd ++ "\""
+            note $ "    rerun " ++ show seed
+            note $ "    rerunOnly " ++ show seed ++ " " ++ "\"" ++ hd ++ "\""
             note "\n"
             note line
             note "❌"
