@@ -3,7 +3,6 @@
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-
 
@@ -296,18 +295,13 @@ binary i = "0b" <> showIntAtBase 2 intToDigit (fromIntegral i) []
 
 {-# INLINE hex #-}
 hex :: Integral i => i -> String
-hex i = "0x" <> (showHex @ Int) (fromIntegral i) []
+hex i = "0x" <> showHex (fromIntegral i :: Int) []
 
 {-# INLINE octal #-}
 octal :: Integral i => i -> String
-octal i = "0o" <> (showOct @ Int) (fromIntegral i) []
+octal i = "0o" <> showOct (fromIntegral i :: Int) []
 
 -- | Generate a random value
---
--- Use TypeApplication to monomorphize.
---
--- > count <- r @ Int
---
 {-# INLINE r #-}
 r :: Random a => Test sync a
 r = do
@@ -319,11 +313,6 @@ r = do
     pure a
 
 -- | Generate a bounded random value. Inclusive on both sides.
---
--- Use TypeApplication to monomorphize.
---
--- > roll <- 1 <..> 6 @ Int
---
 {-# INLINE (<..>) #-}
 (<..>) :: Random a => a -> a -> Test sync a
 (<..>) lower upper = do
