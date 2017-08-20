@@ -66,7 +66,7 @@ module Easy
   , skip
   , crash
   , complete
-  , expect, expectJust, expectRight
+  , expect, expectNothing, expectJust, expectLeft, expectRight
 
   , store, store'
   , retrieve, retrieve'
