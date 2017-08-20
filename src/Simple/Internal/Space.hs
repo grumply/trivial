@@ -29,51 +29,127 @@ newtype SomeSpace = SomeSpace { getBytes :: Double }
 instance Vary SomeSpace
 
 instance Base SomeSpace where
-  base _ = 2
+  base _ = 2 -- based on my ingrained intuition
 
-instance Similar SomeSpace where
+instance Similar SomeSpace where -- intuitionistic; megabytes
   sim b (Megabytes b1) (Megabytes b2) = sim b b1 b2
 
-instance Magnitude SomeSpace where
+instance Magnitude SomeSpace where -- intuitionistic; megabytes
   mag b (Megabytes b1) (Megabytes b2) = mag b b1 b2
 
 instance IsSpace SomeSpace where
   toSpace = id
   fromSpace = id
 
+pattern Attobytes :: IsSpace b => Double -> b
+pattern Attobytes abs <- ((* 1e18) . getBytes . fromSpace -> abs) where
+  Attobytes (toSpace . SomeSpace . (/ 1e18) -> s) = s
+
+pattern Femtobytes :: IsSpace b => Double -> b
+pattern Femtobytes fbs <- ((* 1e15) . getBytes . fromSpace -> fbs) where
+  Femtobytes (toSpace . SomeSpace . (/ 1e15) -> s) = s
+
+pattern Picobytes :: IsSpace b => Double -> b
+pattern Picobytes pbs <- ((* 1e12) . getBytes . fromSpace -> pbs) where
+  Picobytes (toSpace . SomeSpace . (/ 1e12) -> s) = s
+
+pattern Nanobytes :: IsSpace b => Double -> b
+pattern Nanobytes nbs <- ((* 1e9) . getBytes . fromSpace -> nbs) where
+  Nanobytes (toSpace . SomeSpace . (/ 1e9) -> s) = s
+
+pattern Microbytes :: IsSpace b => Double -> b
+pattern Microbytes ubs <- ((* 1e6) . getBytes . fromSpace -> ubs) where
+  Microbytes (toSpace . SomeSpace . (/ 1e6) -> s) = s
+
+pattern Millibytes :: IsSpace b => Double -> b
+pattern Millibytes mbs <- ((* 1e3) . getBytes . fromSpace -> mbs) where
+  Millibytes (toSpace . SomeSpace . (/ 1e3) -> s) =s
+
 pattern Bytes :: IsSpace b => Double -> b
 pattern Bytes bs <- (getBytes . fromSpace -> bs) where
   Bytes (toSpace . SomeSpace -> s) = s
+
+pattern Kibibytes :: IsSpace b => Double -> b
+pattern Kibibytes bs <- ((/ 1e3) . getBytes . fromSpace -> bs) where
+  Kibibytes (toSpace . SomeSpace . (*1e3) -> s) = s
 
 pattern Kilobytes :: IsSpace b => Double -> b
 pattern Kilobytes kbs <- ((/ 2^10) . getBytes . fromSpace -> kbs) where
   Kilobytes (toSpace . SomeSpace . (*2^10) -> s) = s
 
+pattern Mebibytes :: IsSpace b => Double -> b
+pattern Mebibytes bs <- ((/ 1e6) . getBytes . fromSpace -> bs) where
+  Mebibytes (toSpace . SomeSpace . (*1e6) -> s) = s
+
 pattern Megabytes :: IsSpace b => Double -> b
 pattern Megabytes mbs <- ((/ 2^20) . getBytes . fromSpace -> mbs) where
   Megabytes (toSpace . SomeSpace . (*2^20) -> s) = s
+
+pattern Gibibytes :: IsSpace b => Double -> b
+pattern Gibibytes bs <- ((/ 1e9) . getBytes . fromSpace -> bs) where
+  Gibibytes (toSpace . SomeSpace . (*1e9) -> s) = s
 
 pattern Gigabytes :: IsSpace b => Double -> b
 pattern Gigabytes gbs <- ((/ 2^30) . getBytes . fromSpace -> gbs) where
   Gigabytes (toSpace . SomeSpace . (*2^30) -> s) = s
 
+pattern Tebibytes :: IsSpace b => Double -> b
+pattern Tebibytes bs <- ((/ 1e12) . getBytes . fromSpace -> bs) where
+  Tebibytes (toSpace . SomeSpace . (*1e12) -> s) = s
+
 pattern Terabytes :: IsSpace b => Double -> b
 pattern Terabytes tbs <- ((/ 2^40) . getBytes . fromSpace -> tbs) where
   Terabytes (toSpace . SomeSpace . (*2^40) -> s) = s
 
+pattern Pebibytes :: IsSpace b => Double -> b
+pattern Pebibytes bs <- ((/ 1e15) . getBytes . fromSpace -> bs) where
+  Pebibytes (toSpace . SomeSpace . (*1e15) -> s) = s
+
+pattern Petabytes :: IsSpace b => Double -> b
+pattern Petabytes tbs <- ((/ 2^50) . getBytes . fromSpace -> tbs) where
+  Petabytes (toSpace . SomeSpace . (*2^50) -> s) = s
+
+pattern Exbibytes :: IsSpace b => Double -> b
+pattern Exbibytes bs <- ((/ 1e18) . getBytes . fromSpace -> bs) where
+  Exbibytes (toSpace . SomeSpace . (*1e18) -> s) = s
+
+pattern Exabytes :: IsSpace b => Double -> b
+pattern Exabytes tbs <- ((/ 2^60) . getBytes . fromSpace -> tbs) where
+  Exabytes (toSpace . SomeSpace . (*2^60) -> s) = s
+
+pattern Zebibytes :: IsSpace b => Double -> b
+pattern Zebibytes bs <- ((/ 1e21) . getBytes . fromSpace -> bs) where
+  Zebibytes (toSpace . SomeSpace . (*1e21) -> s) = s
+
+pattern Zettabytes :: IsSpace b => Double -> b
+pattern Zettabytes tbs <- ((/ 2^70) . getBytes . fromSpace -> tbs) where
+  Zettabytes (toSpace . SomeSpace . (*2^70) -> s) = s
+
+pattern Yobibytes :: IsSpace b => Double -> b
+pattern Yobibytes bs <- ((/ 1e24) . getBytes . fromSpace -> bs) where
+  Yobibytes (toSpace . SomeSpace . (*1e24) -> s) = s
+
+pattern Yottabytes :: IsSpace b => Double -> b
+pattern Yottabytes tbs <- ((/ 2^80) . getBytes . fromSpace -> tbs) where
+  Yottabytes (toSpace . SomeSpace . (*2^80) -> s) = s
+
 instance Pretty SomeSpace where
     pretty (SomeSpace b)
-        | b < 2**(-40) = printf "%.2f aB" (b * 2^50)
-        | b < 2**(-30) = printf "%.2f fB" (b * 2^40)
-        | b < 2**(-20) = printf "%.2f pB" (b * 2^30)
-        | b < 2**(-20) = printf "%.2f nB" (b * 2^30)
-        | b < 2**(-10) = printf "%.2f μB" (b * 2^20)
-        | b < 1        = printf "%.2f mB" (b * 2^10)
-        | b < 2^10     = printf "%.0f B" b
-        | b < 2^20     = printf "%.2f KB" (b / 2^10)
-        | b < 2^30     = printf "%.2f MB" (b / 2^20)
-        | b < 2^40     = printf "%.2f GB" (b / 2^30)
-        | otherwise    = printf "%.2f TB" (b / 2^40)
+        | b < 1e-15 = printf "%.2f aB"  (b * 1e18)
+        | b < 1e-12 = printf "%.2f fB"  (b * 1e15)
+        | b < 1e-9  = printf "%.2f pB"  (b * 1e12)
+        | b < 1e-6  = printf "%.2f nB"  (b * 1e9)
+        | b < 1e-3  = printf "%.2f μB"  (b * 1e6)
+        | b < 1     = printf "%.2f mB"  (b * 1e3)
+        | b < 1e3   = printf "%.0f B"    b
+        | b < 1e6   = printf "%.2f KiB" (b / 1e3)
+        | b < 1e9   = printf "%.2f MiB" (b / 1e6)
+        | b < 1e12  = printf "%.2f GiB" (b / 1e9)
+        | b < 1e15  = printf "%.2f TiB" (b / 1e12)
+        | b < 1e18  = printf "%.2f PiB" (b / 1e15)
+        | b < 1e21  = printf "%.2f EiB" (b / 1e18)
+        | b < 1e24  = printf "%.2f ZiB" (b / 1e21)
+        | otherwise = printf "%.2f YiB" (b / 1e24)
 
 ----------------------------------------
 -- Mutated Bytes
