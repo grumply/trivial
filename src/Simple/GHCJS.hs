@@ -224,9 +224,10 @@ instance Pretty BenchDiff where
             , cpuTimeStats
             , mutTimeStats
             , gcTimeStats
-            , ""
-            , "Old Bytes:      " <> pad 11 (pretty (br_alloc bd_bench1)) <> " in " <> pretty (br_runs bd_bench1) <> " runs"
-            , "New Bytes:      " <> pad 11 (pretty (br_alloc bd_bench2)) <> " in " <> pretty (br_runs bd_bench2) <> " runs"
+            -- This information wasn't useful or accurate.
+            -- , ""
+            -- , "Old Bytes:      " <> pad 11 (pretty (br_alloc bd_bench1)) <> " in " <> pretty (br_runs bd_bench1) <> " runs"
+            -- , "New Bytes:      " <> pad 11 (pretty (br_alloc bd_bench2)) <> " in " <> pretty (br_runs bd_bench2) <> " runs"
             ]
       where
         header2 = "            Time |    Relative |       Space |    Throughput"
@@ -304,9 +305,10 @@ instance Pretty Report where
             , oldGcTimeStats
             , newGcTimeStats
             , gcTimeDiff
-            , ""
-            , "Old Bytes:      " <> pad 11 (pretty (br_alloc bd_bench1)) <> " in " <> pretty (br_runs bd_bench1) <> " runs"
-            , "New Bytes:      " <> pad 11 (pretty (br_alloc bd_bench2)) <> " in " <> pretty (br_runs bd_bench2) <> " runs"
+            -- This information wasn't useful or accurate.
+            -- , ""
+            -- , "Old Bytes:      " <> pad 11 (pretty (br_alloc bd_bench1)) <> " in " <> pretty (br_runs bd_bench1) <> " runs"
+            -- , "New Bytes:      " <> pad 11 (pretty (br_alloc bd_bench2)) <> " in " <> pretty (br_runs bd_bench2) <> " runs"
             ]
       where
         oldCpuTimeStats =
