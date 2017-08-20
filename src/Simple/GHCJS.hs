@@ -30,6 +30,8 @@ import GHCJS.Types
 
 import System.IO.Unsafe
 
+import Debug.Trace
+
 chrome_needed f = do
   unless can_gc $ io $ do
     install_facade_gc
@@ -41,6 +43,9 @@ chrome_needed f = do
              , "`--args --enable-precise-memory-info --enable-memory-info --js-flags=\"--expose-gc\"`.\n"
              , "Without Chrome's memory statistics, this library will only produce timing results."
              ]
+
+foreign import javascript unsafe
+  "$r = window.performance.memory && 96 || 0" memory_stats_overhead :: Int
 
 foreign import javascript unsafe
   "$r = typeof window.gc === 'function'" can_gc :: Bool
@@ -79,6 +84,7 @@ withEnvCleanup nm mkenv f c = withEnv nm mkenv (\env -> f env >> c env)
 
 data BenchResult = BenchResult
   { br_runs :: {-# UNPACK #-}!SomeCount
+  , br_dur :: {-# UNPACK #-}!Elapsed
   , br_cpu :: {-# UNPACK #-}!Elapsed
   , br_mut :: {-# UNPACK #-}!Elapsed
   , br_gc  :: {-# UNPACK #-}!Elapsed
@@ -93,17 +99,18 @@ instance Magnitude BenchResult
 
 instance Monoid BenchResult where
   {-# INLINE mempty #-}
-  mempty = BenchResult 0 0 0 0 0 0 0
+  mempty = BenchResult 0 0 0 0 0 0 0 0
   {-# INLINE mappend #-}
   mappend br1 br2 =
     let !brruns  = br_runs br1  + br_runs br2
+        !brdur   = br_dur br1   + br_dur br2
         !brcpu   = br_cpu br1   + br_cpu br2
         !brmut   = br_mut br1   + br_mut br2
         !brgc    = br_gc br1    + br_gc br2
         !brjsgc  = br_js_gc br1 + br_js_gc br2
         !bralloc = br_alloc br1 + br_alloc br2
         !brdealloc = br_dealloc br1 + br_dealloc br2
-    in BenchResult brruns brcpu brmut brgc brjsgc bralloc brdealloc
+    in BenchResult brruns brdur brcpu brmut brgc brjsgc bralloc brdealloc
 
 {-# INLINE allocRate #-}
 allocRate :: BenchResult -> AllocationRate
@@ -116,6 +123,10 @@ deallocRate br = DataRate (dealloc br) (gc br) -- deallocation per GC second
 {-# INLINE runs #-}
 runs :: BenchResult -> SomeCount
 runs = br_runs
+
+{-# INLINE dur #-}
+dur :: BenchResult -> Elapsed
+dur = br_dur
 
 {-# INLINE cpu #-}
 cpu :: BenchResult -> Elapsed
@@ -149,6 +160,7 @@ instance Pretty BenchResult where
             , gcTimeStats
             , ""
             , "Runs:       " <> pad 11 (pretty (runs br))
+            , "Bytes:      " <> pad 11 (pretty br_alloc)
             ]
       where
         header2 = "                Time           |       Space |    Throughput"
@@ -212,6 +224,9 @@ instance Pretty BenchDiff where
             , cpuTimeStats
             , mutTimeStats
             , gcTimeStats
+            , ""
+            , "Old Bytes:      " <> pad 11 (pretty (br_alloc bd_bench1)) <> " in " <> pretty (br_runs bd_bench1) <> " runs"
+            , "New Bytes:      " <> pad 11 (pretty (br_alloc bd_bench2)) <> " in " <> pretty (br_runs bd_bench2) <> " runs"
             ]
       where
         header2 = "            Time |    Relative |       Space |    Throughput"
@@ -289,6 +304,9 @@ instance Pretty Report where
             , oldGcTimeStats
             , newGcTimeStats
             , gcTimeDiff
+            , ""
+            , "Old Bytes:      " <> pad 11 (pretty (br_alloc bd_bench1)) <> " in " <> pretty (br_runs bd_bench1) <> " runs"
+            , "New Bytes:      " <> pad 11 (pretty (br_alloc bd_bench2)) <> " in " <> pretty (br_runs bd_bench2) <> " runs"
             ]
       where
         oldCpuTimeStats =
@@ -369,18 +387,20 @@ instance Pretty Report where
 mkBenchResult :: Int64 -> JSVal -> JSVal -> JSVal -> Elapsed -> Elapsed -> Elapsed -> Elapsed -> BenchResult
 mkBenchResult n start_stats mid_stats end_stats start_time end_mut_time end_gc_time end_time =
   let br_runs     = fromIntegral n
-      !br_cpu     = end_time - start_time
+      !br_dur     = end_time - start_time
+      !br_cpu     = end_gc_time - start_time
       !br_mut     = end_mut_time - start_time
       !br_gc      = end_gc_time - end_mut_time
       !br_js_gc   = end_time - end_gc_time
-      !br_alloc   = realToFrac $ used_js_heap_size_js mid_stats - used_js_heap_size_js start_stats
-      !br_dealloc = realToFrac $ used_js_heap_size_js mid_stats - used_js_heap_size_js end_stats
+      !br_alloc   = realToFrac $ used_js_heap_size_js mid_stats - used_js_heap_size_js start_stats - memory_stats_overhead
+      !br_dealloc = realToFrac $ used_js_heap_size_js mid_stats - used_js_heap_size_js end_stats - memory_stats_overhead
   in BenchResult {..}
 
 removeOverhead :: BenchResult -> BenchResult -> BenchResult
 removeOverhead overhead br =
   BenchResult
     (br_runs br)
+    (br_dur br)
     (max 0 (br_cpu br - br_cpu overhead))
     (max 0 (br_mut br - br_mut overhead))
     (br_gc br)
@@ -402,13 +422,13 @@ nf nm f b = chrome_needed $ scope nm $ do
     {-# INLINE run #-}
     run :: BenchResult -> IO BenchResult
     run br
-      | br_cpu br < Milliseconds 100 = do
+      | br_dur br < Milliseconds 100 = do
           let rs = 10 * runs br
           br' <- execute (round rs)
           run br'
 
       | otherwise = do
-          let rs = realToFrac $ Seconds 5 / cpu br
+          let rs = realToFrac $ Seconds 5 / dur br * realToFrac (runs br)
           execute (round rs)
 
     {-# INLINE execute #-}
@@ -465,7 +485,7 @@ nfio nm f = chrome_needed $ scope nm $ do
     go br = do
       br' <- execute
       let !br'' = br <> br'
-      if br_cpu br'' > Seconds 5 then
+      if dur br'' > Seconds 5 then
         return br''
       else
         go br''
@@ -480,7 +500,7 @@ nfio nm f = chrome_needed $ scope nm $ do
         start_stats <- get_memory_stats_js
         start_time  <- get_cpu_time_js
 
-        -- the actual test we're interested in; n iterations of (f $ b)
+        -- the actual test we're interested in
         a <- f
 
         mid_stats <- a `deepseq` get_memory_stats_js
@@ -520,7 +540,7 @@ nfwithCleanup nm alloc act cleanup = chrome_needed $ scope nm $ do
     go !c br = do
       br' <- execute c
       let !br'' = br <> br'
-      if br_cpu br'' > Seconds 5 then
+      if dur br'' > Seconds 5 then
         return br''
       else
         go (c + 1) br''
@@ -539,7 +559,7 @@ nfwithCleanup nm alloc act cleanup = chrome_needed $ scope nm $ do
         start_stats <- get_memory_stats_js
         start_time  <- get_cpu_time_js
 
-        -- the actual test we're interested in; n iterations of (f $ b)
+        -- the actual test we're interested in
         a <- act n env
 
         mid_stats <- a `deepseq` get_memory_stats_js
@@ -580,7 +600,7 @@ nfwith nm alloc act = chrome_needed $ scope nm $ do
     go !c br = do
       br' <- execute c
       let !br'' = br <> br'
-      if br_cpu br'' > Seconds 5 then
+      if dur br'' > Seconds 5 then
         return br''
       else
         go (c + 1) br''
@@ -599,7 +619,7 @@ nfwith nm alloc act = chrome_needed $ scope nm $ do
         start_stats <- get_memory_stats_js
         start_time  <- get_cpu_time_js
 
-        -- the actual test we're interested in; n iterations of (f $ b)
+        -- the actual test we're interested in
         a <- act n env
 
         mid_stats <- a `deepseq` get_memory_stats_js
@@ -639,13 +659,13 @@ whnf nm f b = chrome_needed $ scope nm $ do
     {-# INLINE run #-}
     run :: BenchResult -> IO BenchResult
     run br
-      | br_cpu br < Milliseconds 100 = do
+      | dur br < Milliseconds 100 = do
           let rs = 10 * runs br
           br' <- execute (round rs)
           run br'
 
       | otherwise = do
-          let rs = realToFrac $ Seconds 5 / cpu br
+          let rs = realToFrac $ Seconds 5 / dur br * realToFrac (runs br)
           execute (round rs)
 
     {-# INLINE execute #-}
@@ -702,7 +722,7 @@ whnfwith nm alloc act = chrome_needed $ scope nm $ do
     go !c br = do
       br' <- execute c
       let !br'' = br <> br'
-      if br_cpu br'' > Seconds 5 then
+      if dur br'' > Seconds 5 then
         return br''
       else
         go (c + 1) br''
@@ -721,7 +741,7 @@ whnfwith nm alloc act = chrome_needed $ scope nm $ do
         start_stats <- get_memory_stats_js
         start_time  <- get_cpu_time_js
 
-        -- the actual test we're interested in; n iterations of (f $ b)
+        -- the actual test we're interested in
         a <- act n env
 
         mid_stats <- a `seq` get_memory_stats_js
@@ -760,7 +780,7 @@ whnfio nm act = chrome_needed $ scope nm $ do
     go br = do
       br' <- execute
       let !br'' = br <> br'
-      if br_cpu br'' > Seconds 5 then
+      if dur br'' > Seconds 5 then
         return br''
       else
         go br''
@@ -775,7 +795,7 @@ whnfio nm act = chrome_needed $ scope nm $ do
         start_stats <- get_memory_stats_js
         start_time  <- get_cpu_time_js
 
-        -- the actual test we're interested in; n iterations of (f $ b)
+        -- the actual test we're interested in
         a <- act
 
         mid_stats <- a `seq` get_memory_stats_js
@@ -814,7 +834,7 @@ whnfwithCleanup nm alloc act cleanup = chrome_needed $ scope nm $ do
     go !c br = do
       br' <- execute c
       let !br'' = br <> br'
-      if br_cpu br'' > Seconds 5 then
+      if dur br'' > Seconds 5 then
         return br''
       else
         go (c + 1) br''
@@ -833,7 +853,7 @@ whnfwithCleanup nm alloc act cleanup = chrome_needed $ scope nm $ do
         start_stats <- get_memory_stats_js
         start_time  <- get_cpu_time_js
 
-        -- the actual test we're interested in; n iterations of (f $ b)
+        -- the actual test we're interested in
         a <- act n env
 
         mid_stats <- a `seq` get_memory_stats_js

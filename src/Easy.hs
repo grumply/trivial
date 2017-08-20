@@ -107,6 +107,8 @@ combineStatus Skipped s             = s
 combineStatus s Skipped             = s
 combineStatus Failed _              = Failed
 combineStatus _ Failed              = Failed
+combineStatus Completed s           = s
+combineStatus s Completed           = s
 combineStatus (Passed n) (Passed m) = Passed (n + m)
 
 data Env =
