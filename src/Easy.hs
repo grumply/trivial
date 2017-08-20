@@ -4,6 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE CPP                        #-}
 {-
 
 Modification of EasyTest from:
@@ -67,6 +68,9 @@ module Easy
   , complete
   , expect, expectJust, expectRight
 
+  , store, store'
+  , retrieve, retrieve'
+
   , currentScope
   )
   where
@@ -99,6 +103,15 @@ import           Data.Char
 import           Numeric
 
 import           Simple.Internal.Pretty
+
+import           Text.Read hiding (lift)
+import           Unsafe.Coerce
+
+#ifdef __GHCJS__
+import           Data.JSString as JSS (JSString,pack,unpack)
+import           GHCJS.Types
+import           GHCJS.Marshal.Pure
+#endif
 
 data Status = Failed | Passed !Int | Skipped | Completed
 
@@ -499,33 +512,55 @@ fork' (Test t) = do
     case a of Nothing -> empty
               Just a  -> pure a
 
--- rewrite to use directory on ghc and localstorage on ghcjs
--- | Read a value from a file that was created
--- with the a call to `writeValue` with the given key in this
--- test scope.
-{-# INLINE readValue #-}
-readValue :: Read a => String -> Test Sync (Maybe a)
-readValue k = do
-    cs <- currentScope
-    let valueFile = "trivial/tests/" <> show (abs $ hash (cs <> k)) <> ".value"
-    exists <- io $ doesFileExist valueFile
-    if exists
-        then io $ do
-            h <- openFile valueFile ReadMode
-            oldResults <- read <$> hGetContents h
-            oldResults `seq` hClose h
-            return (Just oldResults)
-        else
-            return Nothing
+#ifdef __GHCJS__
+foreign import javascript unsafe
+  "localStorage.setItem($1,$2)" set_item_js :: JSString -> JSString -> IO ()
+foreign import javascript unsafe
+  "localStorage.getItem($1)" get_item_js :: JSString -> IO JSVal
+foreign import javascript unsafe
+  "$r = typeof $1 === 'string'" is_string_js :: JSVal -> Bool
+#endif
 
--- rewrite to use directory on ghc and localstorage on ghcjs
--- | Persist a value in a file that will only be
--- readable by calling `readValue` with the key given
--- to `writeValue` and in this benchmark scope.
-{-# INLINE writeValue #-}
-writeValue :: Show a => String -> a -> Test Sync ()
-writeValue k v = do
-    cs <- currentScope
-    let dir = "trivial/tests/"
-    io $ createDirectoryIfMissing True dir
-    io $ writeFile (dir <> show (abs $ hash (cs <> k)) <> ".value") (show v)
+{-# INLINE store' #-}
+store' :: (Show v) => String -> String -> v -> IO ()
+store' cs k v = do
+  let dir = "trivial/"
+#ifdef __GHCJS__
+  set_item_js (JSS.pack (dir <> show (abs $ hash (cs <> k)))) (JSS.pack $ show v)
+#else
+  createDirectoryIfMissing True dir
+  writeFile (dir <> show (abs $ hash (cs <> k))) (show v)
+#endif
+
+{-# INLINE store #-}
+store :: (Show v) => String -> v -> Test sync ()
+store k v = do
+  cs <- currentScope
+  io $ store' cs k v
+
+{-# INLINE retrieve' #-}
+retrieve' :: (Read v) => String -> String -> IO (Maybe v)
+retrieve' cs k = do
+  let loc = "trivial/" <> show (abs $ hash (cs <> k))
+#ifdef __GHCJS__
+  mv <- get_item_js (JSS.pack loc)
+  if is_string_js mv then
+    return $ readMaybe $ JSS.unpack $ pFromJSVal mv
+  else
+    return Nothing
+#else
+  exists <- doesFileExist loc
+  if exists then do
+    h <- openFile loc ReadMode
+    c <- hGetContents h
+    c `deepseq` hClose h
+    return $ readMaybe c
+  else
+    return Nothing
+#endif
+
+{-# INLINE retrieve #-}
+retrieve :: (Read v) => String -> Test sync (Maybe v)
+retrieve k = do
+  cs <- currentScope
+  io $ retrieve' cs k
