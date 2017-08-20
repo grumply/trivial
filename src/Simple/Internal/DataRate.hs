@@ -119,3 +119,28 @@ instance Similar AllocationRate where
     (DataRate (Megabytes mbps' :: SomeSpace) (_ :: SomeTime))
       = sim b mbps mbps'
 
+----------------------------------------
+-- Deallocation Rate
+
+newtype DeallocationRate = DeallocationRate { getDeallocationRate :: SomeDataRate }
+  deriving (Generic,Eq,Ord,Num,Real,Fractional,Floating,RealFrac,RealFloat,Read,Show,ToJSON,FromJSON,Pretty)
+
+instance Vary DeallocationRate
+
+instance Magnitude DeallocationRate
+
+instance IsDataRate DeallocationRate where
+  toDataRate = DeallocationRate
+  fromDataRate = getDeallocationRate
+
+instance Improving DeallocationRate -- more throughput is better
+
+instance Base DeallocationRate where
+  base _ = 2
+
+instance Similar DeallocationRate where
+  sim b
+    (DataRate (Megabytes mbps :: SomeSpace) (_ :: SomeTime))
+    (DataRate (Megabytes mbps' :: SomeSpace) (_ :: SomeTime))
+      = sim b mbps mbps'
+

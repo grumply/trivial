@@ -36,8 +36,7 @@ THE SOFTWARE.
 -}
 
 module Easy
-  ( module Control.Monad.Managed
-  , module Control.Monad
+  ( module Control.Monad
   , module Control.Applicative
 
   , seq, deepseq
@@ -51,7 +50,7 @@ module Easy
 
   , scope
 
-  , note, note', noteScoped, notep
+  , note, note', noteScoped, notep, noteLine
   , binary, hex, octal
 
   , run, runOnly, rerunOnly, tests
@@ -65,10 +64,9 @@ module Easy
   , ok
   , skip
   , crash
-  -- , fail
+  , complete
   , expect, expectJust, expectRight
 
-  , completed
   , currentScope
   )
   where
@@ -83,8 +81,8 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Reader
 import           Data.Hashable
 import           Data.List
-import           Data.Map                 (Map)
-import qualified Data.Map                 as Map
+import           Data.HashMap.Strict        (HashMap)
+import qualified Data.HashMap.Strict        as HM
 import           Data.Monoid
 import           Data.Word
 import           GHC.Stack
@@ -94,9 +92,8 @@ import           System.IO
 import           System.Random            (Random)
 import qualified System.Random            as Random
 
+import           Control.Exception
 import           Control.DeepSeq
-
-import           Control.Monad.Managed
 
 import           Data.Char
 import           Numeric
@@ -117,7 +114,8 @@ data Env =
       , messages :: String
       , results  :: TBQueue (Maybe (TMVar (String, Status)))
       , noter    :: String -> IO ()
-      , allow    :: String }
+      , allow    :: String
+      }
 
 data Async
 data Sync
@@ -132,10 +130,9 @@ io = liftIO
 atomicLogger :: IO (String -> IO ())
 atomicLogger = do
   lock <- newMVar ()
-  pure $ \msg ->
-    -- force msg before acquiring lock
-    let dummy = foldl' (\_ ch -> ch == 'a') True msg
-    in dummy `seq` bracket (takeMVar lock) (\_ -> putMVar lock ()) (\_ -> putStrLn msg)
+  pure $ \msg -> do
+    evaluate $ force msg
+    withMVar lock $ \_ -> putStrLn msg
 
 {-# INLINE expect #-}
 expect :: HasCallStack => Bool -> Test sync ()
@@ -144,13 +141,23 @@ expect True  = ok
 
 {-# INLINE expectJust #-}
 expectJust :: HasCallStack => Maybe a -> Test sync a
-expectJust Nothing  = crash "expected Just, got Nothing"
 expectJust (Just a) = ok >> pure a
+expectJust _ = crash "expected Just, got Nothing"
+
+{-# INLINE expectNothing #-}
+expectNothing :: HasCallStack => Maybe a -> Test sync ()
+expectNothing Nothing  = ok
+expectNothing _ = crash "expected Nothing, got Just"
 
 {-# INLINE expectRight #-}
-expectRight :: HasCallStack => Either e a -> Test sync a
-expectRight (Left _)  = crash "expected Right, got Left"
+expectRight :: HasCallStack => Either l r -> Test sync r
 expectRight (Right a) = ok >> pure a
+expectRight _ = crash "expected Right, got Left"
+
+{-# INLINE expectLeft #-}
+expectLeft :: HasCallStack => Either l r -> Test sync l
+expectLeft (Left l) = ok >> pure l
+expectLeft _ = crash "expected Left, got Right"
 
 {-# INLINE tests #-}
 tests :: [Test sync ()] -> Test sync ()
@@ -186,28 +193,28 @@ run' seed note allow (Test t) = do
   resultsQ <- atomically (newTBQueue 50)
   rngVar <- newTVarIO rng
   note $ "Randomness seed for this run is " ++ show seed ++ ""
-  results <- atomically $ newTVar Map.empty
+  results <- atomically $ newTVar HM.empty
   rs <- A.async . forever $ do
     -- note, totally fine if this bombs once queue is empty
     Just result <- atomically $ readTBQueue resultsQ
     (msgs, passed) <- atomically $ takeTMVar result
-    atomically $ modifyTVar results (Map.insertWith combineStatus msgs passed)
+    atomically $ modifyTVar results (HM.insertWith combineStatus msgs passed)
     resultsMap <- readTVarIO results
-    case Map.findWithDefault Skipped msgs resultsMap of
+    case HM.lookupDefault Skipped msgs resultsMap of
       Skipped -> pure ()
-      Passed n -> note $ "OK " ++ (if n <= 1 then msgs else "(" ++ show n ++ ") " ++ msgs)
-      Failed -> note $ "FAILED " ++ msgs
-      Completed -> note $ "COMPLETED"
-  let line = "------------------------------------------------------------"
+      Passed n -> note $ "👌  OK " ++ (if n <= 1 then msgs else "(" ++ show n ++ ") " ++ msgs)
+      Failed -> note $ "👎  FAILED " ++ msgs
+      Completed -> note $ "👌  COMPLETED " ++ msgs
   note "Raw test output to follow ... "
-  note line
+  let noteLine = note "------------------------------------------------------------"
+  noteLine
   e <- try (runReaderT t (Env rngVar [] resultsQ note allow))
   let finish = do
         atomically $ writeTBQueue resultsQ Nothing
         _ <- A.waitCatch rs
         resultsMap <- readTVarIO results
         let
-          resultsList = Map.toList resultsMap
+          resultsList = HM.toList resultsMap
           succeededList = [ n | (_, Passed n) <- resultsList ]
           succeeded = length succeededList
           -- totalTestCases = foldl' (+) 0 succeededList
@@ -215,7 +222,7 @@ run' seed note allow (Test t) = do
           failed = length failures
         case failures of
           [] -> do
-            note line
+            noteLine
             case succeeded of
               0 -> do
                 note "😶  hmm ... no test results recorded"
@@ -224,7 +231,7 @@ run' seed note allow (Test t) = do
               1 -> note $ "✅  1 test passed, no failures! 👍 🎉"
               _ -> note $ "✅  " ++ show succeeded ++ " tests passed, no failures! 👍 🎉"
           (hd:_) -> do
-            note line
+            noteLine
             note "\n"
             note $ "  " ++ show succeeded ++ (if failed == 0 then " PASSED" else " passed")
             note $ "  " ++ show (length failures) ++ (if failed == 0 then " failed" else " FAILED (failed scopes below)")
@@ -234,7 +241,7 @@ run' seed note allow (Test t) = do
             note $ "    rerun " ++ show seed
             note $ "    rerunOnly " ++ show seed ++ " " ++ "\"" ++ hd ++ "\""
             note "\n"
-            note line
+            noteLine
             note "❌"
             exitWith (ExitFailure 1)
   case e of
@@ -246,6 +253,9 @@ run' seed note allow (Test t) = do
       finish
       return a
 
+noteLine :: Test sync ()
+noteLine = note "------------------------------------------------------------"
+
 {-# INLINE scope #-}
 -- | Label a test. Can be nested. A `'.'` is placed between nested
 -- scopes, so `scope "foo" . scope "bar"` is equivalent to `scope "foo.bar"`
@@ -255,7 +265,9 @@ scope msg (Test t) = Test $ do
   let messages' = case messages env of [] -> msg; ms -> ms ++ ('.':msg)
   case (null (allow env) || take (length (allow env)) msg `isPrefixOf` allow env) of
     False -> putResult Skipped >> pure Nothing
-    True -> liftIO $ runReaderT t (env { messages = messages', allow = drop (length msg + 1) (allow env) })
+    True ->
+      let allow' = drop (length msg + 1) (allow env)
+      in liftIO $ runReaderT t (env { messages = messages', allow = allow' })
 
 {-# INLINE currentScope #-}
 -- | The current scope
@@ -379,12 +391,17 @@ runWrap env t = do
 -- | Record a successful test at the current scope
 {-# INLINE ok #-}
 ok :: Test sync ()
-ok = Test (Just <$> putResult (Passed 1))
+ok = Test (Just <$> putResult (Passed 1)) >> io yield
+
+-- | Record a completed benchmark in the current scope
+{-# INLINE complete #-}
+complete :: Test sync ()
+complete = Test (Just <$> putResult Completed) >> io yield
 
 -- | Explicitly skip this test
 {-# INLINE skip #-}
 skip :: Test sync ()
-skip = Test (Nothing <$ putResult Skipped)
+skip = Test (Nothing <$ putResult Skipped) >> io yield
 
 -- | Record a failure at the current scope
 {-# INLINE crash #-}
@@ -393,10 +410,6 @@ crash msg = do
   let trace = callStack
       msg' = msg ++ " " ++ prettyCallStack trace
   Test (Just <$> putResult Failed) >> note ("FAILURE " ++ msg') >> Test (pure Nothing)
-
-{-# INLINE completed #-}
-completed :: Test sync ()
-completed = Test (Just <$> putResult Completed)
 
 {-# INLINE putResult #-}
 putResult :: Status -> ReaderT Env IO ()
@@ -492,7 +505,7 @@ fork' (Test t) = do
 readValue :: Read a => String -> Test Sync (Maybe a)
 readValue k = do
     cs <- currentScope
-    let valueFile = "trivial/tests/" <> show (abs $ hash cs + hash k) <> ".value"
+    let valueFile = "trivial/tests/" <> show (abs $ hash (cs <> k)) <> ".value"
     exists <- io $ doesFileExist valueFile
     if exists
         then io $ do
@@ -513,4 +526,4 @@ writeValue k v = do
     cs <- currentScope
     let dir = "trivial/tests/"
     io $ createDirectoryIfMissing True dir
-    io $ writeFile (dir <> show (abs $ hash cs + hash k) <> ".value") (show v)
+    io $ writeFile (dir <> show (abs $ hash (cs <> k)) <> ".value") (show v)

@@ -1,6 +1,6 @@
 name:                trivial
 version:             0.1.0.0
-synopsis:            Simple benchmarking and Easy testing.
+synopsis:            Simple benchmarking and Easy testing for GHC and GHCJS.
 -- description:         
 homepage:            github.com/grumply/champ
 license:             BSD3
@@ -14,28 +14,50 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:    Easy
-                      Simple
-                      Trivial
-                      Simple.Internal.Base
-                      Simple.Internal.Count
-                      Simple.Internal.DataRate
-                      Simple.Internal.Factor
-                      Simple.Internal.Improving
-                      Simple.Internal.Magnitude
-                      Simple.Internal.Percent
-                      Simple.Internal.Pretty
-                      Simple.Internal.Rate
-                      Simple.Internal.Similar
-                      Simple.Internal.Space
-                      Simple.Internal.Time
-                      Simple.Internal.Utilities
-                      Simple.Internal.Variance
-                      Simple.Types
-                      Simple.Internal
+  if (impl(ghcjs))
+    build-depends:       aeson, async, base >=4.5, deepseq, directory, ghcjs-base, hashable, mtl, random, stm, text, transformers, unordered-containers, vector
+    exposed-modules:    Easy
+                        Simple
+                        Trivial
+                        Simple.Internal.Base
+                        Simple.Internal.Count
+                        Simple.Internal.DataRate
+                        Simple.Internal.Factor
+                        Simple.Internal.Improving
+                        Simple.Internal.Magnitude
+                        Simple.Internal.Percent
+                        Simple.Internal.Pretty
+                        Simple.Internal.Rate
+                        Simple.Internal.Similar
+                        Simple.Internal.Space
+                        Simple.Internal.Time
+                        Simple.Internal.Utilities
+                        Simple.Internal.Variance
+                        Simple.Types
+                        Simple.GHCJS
+  else
+    build-depends:       aeson, async, base >=4.5, deepseq, directory, hashable, mtl, random, stm, text, transformers, unordered-containers, vector
+    exposed-modules:    Easy
+                        Simple
+                        Trivial
+                        Simple.Internal.Base
+                        Simple.Internal.Count
+                        Simple.Internal.DataRate
+                        Simple.Internal.Factor
+                        Simple.Internal.Improving
+                        Simple.Internal.Magnitude
+                        Simple.Internal.Percent
+                        Simple.Internal.Pretty
+                        Simple.Internal.Rate
+                        Simple.Internal.Similar
+                        Simple.Internal.Space
+                        Simple.Internal.Time
+                        Simple.Internal.Utilities
+                        Simple.Internal.Variance
+                        Simple.Types
+                        Simple.GHC
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       aeson, async, base >=4.5, containers, deepseq, directory, hashable, managed, mtl, random, stm, text, unordered-containers, vector, transformers
   hs-source-dirs:      src
   default-language:    Haskell2010
 

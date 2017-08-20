@@ -114,6 +114,25 @@ instance Improving Allocated where
   improvingShow _ = ">"
 
 ----------------------------------------
+-- De-Allocated Bytes
+
+newtype Deallocated = Deallocated { getDeallocated :: SomeSpace }
+  deriving (Generic,Eq,Ord,Num,Real,RealFrac,Floating,RealFloat,Fractional,Read,Show,Pretty,ToJSON,FromJSON,Base,Magnitude)
+
+instance Vary Deallocated
+
+instance IsSpace Deallocated where
+  toSpace = Deallocated
+  fromSpace = getDeallocated
+
+instance Similar Deallocated where
+  sim b (Megabytes mb1) (Megabytes mb2) = sim b mb1 mb2
+
+instance Improving Deallocated where
+  improving b1 b2 = b1 > b2 -- fewer mutated bytes are better
+  improvingShow _ = ">"
+
+----------------------------------------
 -- GC Slop
 
 newtype Slop = Slop { getSlop :: SomeSpace }
