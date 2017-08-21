@@ -10,4 +10,5 @@ env:
     - COMPILER=ghc801
     - COMPILER=ghcjsHEAD
 
+    
 script: "travis_wait nix-build -E \'with import <nixpkgs> { }; import ./default.nix { compiler="\"$COMPILER\""; }\'"
