@@ -6,8 +6,8 @@ cache:
 
 env:
   matrix:
-    - COMPILER=ghc7103
-    - COMPILER=ghc801
-    - COMPILER=ghcjsHEAD
+    - "COMPILER=ghc7103\""
+    - "COMPILER=\"ghc801\""
+    - "COMPILER=\"ghcjsHEAD\""
 
-script: "travis_wait nix-build -E 'with import <nixpkgs> { }; import ./default.nix { compiler=\"$COMPILER\"; }'"
+script: travis_wait nix-build -E 'with import <nixpkgs> { }; import ./default.nix { compiler=$COMPILER; }'
