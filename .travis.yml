@@ -1,0 +1,13 @@
+language: nix
+
+cache:
+  directories:
+  - "/nix"
+
+env:
+  matrix:
+    - COMPILER=ghc7103
+    - COMPILER=ghc801
+    - COMPILER=ghcjsHEAD
+
+script: nix-build
