@@ -10,26 +10,21 @@ module Simple.GHC (module Simple.GHC, module Export) where
 
 import Easy as Export
 
-import Simple.Internal
 import Simple.Types
 import Simple.Internal.Count
 
 import Data.Int
-import Data.List (intercalate,foldl')
+import Data.List (intercalate)
 
-import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
 import Data.Monoid
+import GHC.Exts
 import GHC.Generics
-import GHC.Stats
-import GHC.Conc
+import GHC.Stats hiding (gc)
 import System.Mem
-import System.CPUTime
 
 import Data.Aeson
-
-import System.IO.Unsafe
 
 {-# INLINE mkRuntimeStats #-}
 mkRuntimeStats :: String -> GCStats -> GCStats -> RuntimeStats
@@ -682,7 +677,6 @@ whnfwithCleanup nm alloc act cleanup = scope nm $ do
 type BenchPred a = a -> BenchResult -> BenchResult -> Bool
 
 data Feature = GC | CPU | MUT | Garbage | Copy | Clock | Allocation | Mutation
-             -- | GCs -- can't collect this info on GHCJS; leaving out of api
   deriving (Eq,Show,Ord,Read,Enum)
 
 data Predicate
