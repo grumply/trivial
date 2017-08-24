@@ -6,9 +6,7 @@ cache:
 
 env:
   matrix:
-    - COMPILER=ghc7103
     - COMPILER=ghc801
-    - COMPILER=ghc821
     - COMPILER=ghcjsHEAD
 
 script: nix-build --argstr compiler $COMPILER
