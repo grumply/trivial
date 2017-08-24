@@ -1,1 +1,1 @@
-(import ./default.nix {}).trivial
+(import ./default.nix {})
