@@ -7,4 +7,4 @@ cache:
 script:
 - |
   nix-env -f "<nixpkgs>" -iA haskellPackages.cabal-install
-  nix-shell -E 'with import <nixpkgs> {}; haskell.packages.ghc821.ghcWithPackages (pkgs: [ ])' --command 'cabal update && cabal configure && cabal install'
+  nix-shell -E 'with import <nixpkgs> {}; haskell.packages.ghc821.ghcWithPackages (pkgs: [ ])' --command 'cabal update && cabal install --dependencies-only && cabal configure && cabal install'
