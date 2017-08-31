@@ -4,9 +4,7 @@ cache:
   directories:
   - "/nix"
 
-env:
-  matrix:
-    - COMPILER=ghc801
-    - COMPILER=ghcjsHEAD
-
-script: travis_wait 30 nix-build --argstr compiler $COMPILER
+script:
+- |
+  nix-env -f "<nixpkgs>" -iA haskellPackages.cabal-install
+  nix-shell -E 'with import <nixpkgs> {}; haskell.packages.ghc821.ghcWithPackages (pkgs: [ ])' --command 'cabal update && cabal configure && cabal install'
