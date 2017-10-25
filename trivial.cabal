@@ -2,7 +2,7 @@ name:                trivial
 version:             0.1.0.0
 synopsis:            Simple benchmarking and Easy testing for GHC and GHCJS.
 -- description:         
-homepage:            github.com/grumply/champ
+homepage:            github.com/grumply/trivial
 license:             BSD3
 license-file:        LICENSE
 author:              Sean M. Hickman
