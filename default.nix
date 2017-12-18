@@ -1,4 +1,4 @@
-{ mkDerivation, aeson, async, base, deepseq, directory, ghc-prim
+{ mkDerivation, ghc, ghcjs-base, aeson, async, base, deepseq, directory, ghc-prim
 , hashable, mtl, random, stdenv, stm, text, transformers
 , unordered-containers, vector
 }:
@@ -9,7 +9,7 @@ mkDerivation {
   libraryHaskellDepends = [
     aeson async base deepseq directory ghc-prim hashable mtl random stm
     text transformers unordered-containers vector
-  ];
+  ] ++ (if ghc.isGhcjs or false then [ ghcjs-base ] else []);
   homepage = "github.com/grumply/trivial";
   description = "Simple benchmarking and Easy testing for GHC and GHCJS";
   license = stdenv.lib.licenses.bsd3;
